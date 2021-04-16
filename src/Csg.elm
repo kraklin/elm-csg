@@ -63,9 +63,15 @@ cube size =
 
 
 simpleFace t =
+    simpleFace_ t
+        |> List.singleton
+        |> BspTree.build
+
+
+simpleFace_ t =
     let
         a =
-            Point3d.meters 0 0 1
+            Point3d.meters 0 0 0
 
         b =
             Point3d.meters 0 0 -1
@@ -74,42 +80,18 @@ simpleFace t =
             Point3d.meters t 0 -1
 
         d =
-            Point3d.meters t 0 1
+            Point3d.meters t 0 0
 
         frontNormal =
             Vector3d.unitless 0 1 0
     in
     Face ( Triangle3d.from a b c, [ Triangle3d.from a c d ] ) frontNormal
-        |> List.singleton
+
+
+clipTest : BspTree c -> BspTree c -> BspTree c
+clipTest c1 c2 =
+    BspTree.clip c1 c2
         |> BspTree.build
-
-
-clipTest : Float -> BspTree c -> Maybe (BspTree c)
-clipTest t cu =
-    let
-        a =
-            Point3d.meters 0 1 0
-
-        b =
-            Point3d.meters 0 -1 0
-
-        c =
-            Point3d.meters t -1 0
-
-        d =
-            Point3d.meters t 1 0
-
-        frontNormal =
-            Vector3d.unitless 0 1 0
-
-        simpleFace_ =
-            Face ( Triangle3d.from a b c, [ Triangle3d.from a c d ] ) frontNormal
-
-        _ =
-            Debug.log "---------" " Clip test start -----------"
-    in
-    BspTree.clipFace simpleFace_ cu
-        |> Maybe.map (List.singleton >> BspTree.build)
 
 
 cuboid : { width : Length.Length, height : Length.Length, depth : Length.Length } -> BspTree coordinates

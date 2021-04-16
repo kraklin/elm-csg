@@ -178,14 +178,16 @@ view model =
 
         cube1 =
             Csg.cube (Length.meters 1)
-                |> Csg.translate (Vector3d.meters 0.5 -0.5 0.5)
+                |> Csg.translate (Vector3d.meters model.clipPlanePosition -0.5 0.5)
 
         cube2 =
-            Csg.simpleFace 1
+            Csg.cube (Length.meters 1)
 
-        split =
-            Csg.clipTest 1 cube1
-                |> Maybe.withDefault BspTree.empty
+        split1 =
+            Csg.clipTest cube2 cube1
+
+        split2 =
+            Csg.clipTest cube1 cube2
     in
     { title = "OrbitingCamera"
     , body =
@@ -200,10 +202,18 @@ view model =
                     |> Csg.toLines
                     |> Mesh.lineSegments
                     |> Scene3d.mesh (Material.color Color.purple)
-                , split
+                , cube2
                     |> Csg.toLines
                     |> Mesh.lineSegments
                     |> Scene3d.mesh (Material.color Color.red)
+                , split1
+                    |> Csg.toMesh
+                    |> Mesh.indexedFaces
+                    |> Scene3d.mesh (Material.matte Color.purple)
+                , split2
+                    |> Csg.toMesh
+                    |> Mesh.indexedFaces
+                    |> Scene3d.mesh (Material.matte Color.red)
 
                 --, Scene3d.mesh (Material.color Color.blue) clippedCubeBottom --cubesWireframe
                 ]
@@ -211,7 +221,7 @@ view model =
             }
         , Html.input
             [ Attrs.value (model.clipPlanePosition |> String.fromFloat)
-            , Attrs.min "-0.1"
+            , Attrs.min "-1.1"
             , Attrs.max "1.1"
             , Attrs.type_ "number"
             , Attrs.step "0.1"

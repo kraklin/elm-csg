@@ -1,5 +1,6 @@
 module BspTree exposing (..)
 
+import Dict
 import Direction3d exposing (Direction3d)
 import Length exposing (Meters)
 import Plane3d exposing (Plane3d)
@@ -197,6 +198,7 @@ divide splittingPlane face =
     in
     allTriangles face
         |> List.map (cutByPlane splittingPlane)
+        |> Debug.log "cuts"
         |> List.foldl
             (\{ front, back } acc ->
                 { inside = back ++ acc.inside
@@ -299,6 +301,15 @@ clipFace clippedFace clippingTree =
                             ( handleInside inside rootData.inside, handleOutside outside rootData.outside )
                                 |> combineFace
                        )
+                    |> Debug.log "result"
+
+
+dedup : List (Point3d Meters c) -> List (Point3d Meters c)
+dedup list =
+    list
+        |> List.map (\point -> ( Point3d.toTuple Length.inMeters point, point ))
+        |> Dict.fromList
+        |> Dict.values
 
 
 cutByPlane : Plane3d Meters c -> Triangle3d Meters c -> { front : List (Triangle3d Meters c), back : List (Triangle3d Meters c) }
@@ -363,9 +374,10 @@ cutByPlane plane triangle =
                         in
                         Point3d.translateBy (Vector3d.interpolateFrom va vb t) Point3d.origin
                     )
+                |> dedup
 
         ( onFront, onBack ) =
-            ( [ pa, pb, pc ] |> List.filter (\p -> p.order == GT) |> List.map .point
+            ( [ pa, pb, pc ] |> List.filter (\p -> p.order == GT || p.order == EQ) |> List.map .point
             , [ pa, pb, pc ] |> List.filter (\p -> p.order == LT) |> List.map .point
             )
 
@@ -384,22 +396,30 @@ cutByPlane plane triangle =
                     else
                         ( i2, i1 )
             in
-            case intersectionPoints of
-                [ i1, i2 ] ->
-                    case points of
-                        [ onePoint ] ->
-                            [ Triangle3d.from onePoint i1 i2 ]
+            Debug.log "make triangles" <|
+                case intersectionPoints of
+                    [ i1, i2 ] ->
+                        case points of
+                            [ onePoint ] ->
+                                [ Triangle3d.from onePoint i1 i2 ]
 
-                        [ firstPoint, secondPoint ] ->
-                            [ Triangle3d.from firstPoint (sortPoints firstPoint i1 i2 |> Tuple.first) (sortPoints firstPoint i1 i2 |> Tuple.second)
-                            , Triangle3d.from firstPoint (sortPoints firstPoint i1 i2 |> Tuple.second) secondPoint
-                            ]
+                            [ firstPoint, secondPoint ] ->
+                                [ Triangle3d.from firstPoint (sortPoints firstPoint i1 i2 |> Tuple.first) (sortPoints firstPoint i1 i2 |> Tuple.second)
+                                , Triangle3d.from firstPoint (sortPoints firstPoint i1 i2 |> Tuple.second) secondPoint
+                                ]
 
-                        _ ->
-                            []
+                            [ v1, v2, v3 ] ->
+                                [ Triangle3d.from v1 v2 v3 ]
 
-                _ ->
-                    []
+                            _ ->
+                                []
+
+                    rest ->
+                        let
+                            _ =
+                                Debug.log "intersection point" rest
+                        in
+                        []
     in
     if d1f > 0 && d2f > 0 && d3f > 0 then
         { front = [ triangle ], back = [] }

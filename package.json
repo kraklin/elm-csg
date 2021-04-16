@@ -1,0 +1,16 @@
+{
+  "name": "elm-csg",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Tomas Latal <latal.tomas@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "elm-live": "^4.0.2",
+    "elm-tooling": "^1.3.0"
+  },
+  "scripts": {
+    "start": "elm-live src/Scene.elm",
+    "test": "elm-test-rs",
+    "postinstall": "elm-tooling install"
+  }
+}

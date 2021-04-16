@@ -7,6 +7,7 @@ mouse events and moving the camera accordingly.
 import Angle exposing (Angle)
 import Browser
 import Browser.Events
+import BspTree
 import Camera3d
 import Color
 import Csg
@@ -177,44 +178,14 @@ view model =
 
         cube1 =
             Csg.cube (Length.meters 1)
-                |> Csg.translate (Vector3d.meters 0.5 0.5 0.5)
+                |> Csg.translate (Vector3d.meters 0.5 -0.5 0.5)
 
         cube2 =
-            Csg.cube (Length.meters 1)
+            Csg.simpleFace 1
 
-        cubes =
-            Csg.union cube1 cube2
-                |> Csg.translate (Vector3d.meters -0.5 -0.5 -0.5)
-
-        cube =
-            cubes
-                |> Csg.toMesh
-                |> Mesh.indexedFaces
-
-        cubesWireframe =
-            cubes
-                |> Csg.toLines
-                |> Mesh.lineSegments
-
-        cutPlane =
-            Plane3d.through (Point3d.meters 0 model.clipPlanePosition 0) Direction3d.y
-
-        controlStuff =
-            Csg.simplePrimitive 2
-                |> Csg.toLines
-                |> Mesh.lineSegments
-
-        clippedCubeTop =
-            cube2
-                |> Csg.clipByPlane cutPlane
-                |> Csg.toLines
-                |> Mesh.lineSegments
-
-        clippedCubeBottom =
-            cube2
-                |> Csg.clipByPlane (Plane3d.flip cutPlane)
-                |> Csg.toLines
-                |> Mesh.lineSegments
+        split =
+            Csg.clipTest 1 cube1
+                |> Maybe.withDefault BspTree.empty
     in
     { title = "OrbitingCamera"
     , body =
@@ -225,17 +196,23 @@ view model =
             , background = Scene3d.transparentBackground
             , entities =
                 [ originCross
+                , cube1
+                    |> Csg.toLines
+                    |> Mesh.lineSegments
+                    |> Scene3d.mesh (Material.color Color.purple)
+                , split
+                    |> Csg.toLines
+                    |> Mesh.lineSegments
+                    |> Scene3d.mesh (Material.color Color.red)
 
-                --, Scene3d.mesh (Material.matte Color.purple) cube
-                , Scene3d.mesh (Material.color Color.red) clippedCubeTop --cubesWireframe
-                , Scene3d.mesh (Material.color Color.blue) clippedCubeBottom --cubesWireframe
+                --, Scene3d.mesh (Material.color Color.blue) clippedCubeBottom --cubesWireframe
                 ]
             , upDirection = Direction3d.positiveZ
             }
         , Html.input
             [ Attrs.value (model.clipPlanePosition |> String.fromFloat)
-            , Attrs.min "0"
-            , Attrs.max "1"
+            , Attrs.min "-0.1"
+            , Attrs.max "1.1"
             , Attrs.type_ "number"
             , Attrs.step "0.1"
             , Events.onInput PlanePositionChanged
@@ -243,12 +220,6 @@ view model =
             []
         ]
     }
-
-
-result =
-    Csg.clasify Plane3d.xy
-        (Csg.simpleFace 3)
-        |> Debug.toString
 
 
 originCross =

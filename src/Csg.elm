@@ -1,13 +1,14 @@
 module Csg exposing (..)
 
 import Bitwise
+import BspTree exposing (BspTree, Face)
 import Color exposing (Color)
 import Direction3d
 import Length exposing (Meters)
 import LineSegment3d exposing (LineSegment3d)
 import Plane3d exposing (Plane3d)
 import Point3d exposing (Point3d)
-import Quantity exposing (Quantity)
+import Quantity exposing (Quantity, Unitless)
 import Triangle3d exposing (Triangle3d)
 import TriangularMesh exposing (TriangularMesh)
 import Vector3d exposing (Vector3d)
@@ -27,28 +28,8 @@ type alias Triangle coordinates =
 type alias Vertex coordinates =
     { position :
         Point3d Length.Meters coordinates
-    , normal : Vector3d Quantity.Unitless coordinates
+    , normal : Vector3d Unitless coordinates
     }
-
-
-type alias Face coordinates =
-    { triangles : ( Triangle3d Length.Meters coordinates, List (Triangle3d Length.Meters coordinates) )
-    , normal : Vector3d Quantity.Unitless coordinates
-    }
-
-
-type CsgOperation
-    = Union
-
-
-type CsgPlacement coordinates
-    = Translate (Vector3d Length.Meters coordinates)
-
-
-type Csg coords
-    = Operation CsgOperation (Csg coords) (Csg coords)
-    | Placement (CsgPlacement coords) (Csg coords)
-    | Primitive (List (Face coords))
 
 
 facesToTriangles : Face coordinates -> List (Triangle coordinates)
@@ -66,7 +47,7 @@ facesToTriangles { triangles, normal } =
     first :: rest |> List.map (\triangle -> Triangle3d.vertices triangle |> withNormal)
 
 
-fromTriangles : Vector3d Quantity.Unitless coordinates -> List (Triangle3d Meters coordinates) -> Maybe (Face coordinates)
+fromTriangles : Vector3d Unitless coordinates -> List (Triangle3d Meters coordinates) -> Maybe (Face coordinates)
 fromTriangles normal triangles =
     case triangles of
         [] ->
@@ -76,7 +57,7 @@ fromTriangles normal triangles =
             Just <| { triangles = ( first, rest ), normal = normal }
 
 
-cube : Length.Length -> Csg coordinates
+cube : Length.Length -> BspTree coordinates
 cube size =
     cuboid { width = size, height = size, depth = size }
 
@@ -99,13 +80,39 @@ simpleFace t =
             Vector3d.unitless 0 1 0
     in
     Face ( Triangle3d.from a b c, [ Triangle3d.from a c d ] ) frontNormal
+        |> List.singleton
+        |> BspTree.build
 
 
-simplePrimitive x =
-    Primitive [ simpleFace x ]
+clipTest : Float -> BspTree c -> Maybe (BspTree c)
+clipTest t cu =
+    let
+        a =
+            Point3d.meters 0 1 0
+
+        b =
+            Point3d.meters 0 -1 0
+
+        c =
+            Point3d.meters t -1 0
+
+        d =
+            Point3d.meters t 1 0
+
+        frontNormal =
+            Vector3d.unitless 0 1 0
+
+        simpleFace_ =
+            Face ( Triangle3d.from a b c, [ Triangle3d.from a c d ] ) frontNormal
+
+        _ =
+            Debug.log "---------" " Clip test start -----------"
+    in
+    BspTree.clipFace simpleFace_ cu
+        |> Maybe.map (List.singleton >> BspTree.build)
 
 
-cuboid : { width : Length.Length, height : Length.Length, depth : Length.Length } -> Csg coordinates
+cuboid : { width : Length.Length, height : Length.Length, depth : Length.Length } -> BspTree coordinates
 cuboid { width, height, depth } =
     let
         z =
@@ -136,10 +143,10 @@ cuboid { width, height, depth } =
             Point3d.xyz width z (Quantity.negate depth)
 
         frontNormal =
-            Vector3d.unitless 0 0 -1
+            Vector3d.unitless 0 0 1
 
         backNormal =
-            Vector3d.unitless 0 0 1
+            Vector3d.unitless 0 0 -1
 
         topNormal =
             Vector3d.unitless 0 1 0
@@ -174,53 +181,19 @@ cuboid { width, height, depth } =
         right =
             Face ( triangle d c g, [ triangle d g h ] ) rightNormal
     in
-    Primitive [ front, back, top, bottom, left, right ]
+    BspTree.build [ front, back, top, bottom, left, right ]
 
 
-union : Csg coords -> Csg coords -> Csg coords
-union csgLeft csgRight =
-    Operation Union csgLeft csgRight
-
-
-translate : Vector3d Length.Meters coords -> Csg coords -> Csg coords
-translate vector csg =
-    Placement (Translate vector) csg
-
-
-build : Csg coordinates -> List (Triangle coordinates)
-build csg =
-    case csg of
-        Primitive faces ->
-            faces
-                |> List.map facesToTriangles
-                |> List.concat
-
-        Placement placement csgToPlace ->
-            case placement of
-                Translate v ->
-                    build csgToPlace
-                        |> List.map
-                            (\( v1, v2, v3 ) ->
-                                ( { v1 | position = Point3d.translateBy v v1.position }
-                                , { v2 | position = Point3d.translateBy v v2.position }
-                                , { v3 | position = Point3d.translateBy v v3.position }
-                                )
-                            )
-
-        Operation op leftCsg rightCsg ->
-            case op of
-                Union ->
-                    build leftCsg ++ build rightCsg
-
-
-toMesh : Csg coordinates -> TriangularMesh (Vertex coordinates)
-toMesh csg =
-    build csg
+toMesh : BspTree coordinates -> TriangularMesh (Vertex coordinates)
+toMesh tree =
+    BspTree.toFaces tree
+        |> List.map facesToTriangles
+        |> List.concat
         |> TriangularMesh.triangles
 
 
-toLines : Csg coordinates -> List (LineSegment3d Length.Meters coordinates)
-toLines csg =
+toLines : BspTree coordinates -> List (LineSegment3d Length.Meters coordinates)
+toLines tree =
     let
         triangleSegments ( v1, v2, v3 ) =
             [ LineSegment3d.from v1.position v2.position
@@ -228,7 +201,9 @@ toLines csg =
             , LineSegment3d.from v3.position v1.position
             ]
     in
-    build csg
+    BspTree.toFaces tree
+        |> List.map facesToTriangles
+        |> List.concat
         |> List.map triangleSegments
         |> List.concat
 
@@ -249,8 +224,8 @@ type Clasify c
 -- make it for triangles
 
 
-cutByPlane : Plane3d Meters c -> Vector3d Quantity.Unitless c -> Triangle3d Meters c -> { front : List (Triangle3d Meters c), back : List (Triangle3d Meters c) }
-cutByPlane plane faceNormal triangle =
+cutByPlane : Plane3d Meters c -> Triangle3d Meters c -> { front : List (Triangle3d Meters c), back : List (Triangle3d Meters c) }
+cutByPlane plane triangle =
     let
         planeNormal =
             Plane3d.normalDirection plane |> Direction3d.toVector
@@ -269,21 +244,6 @@ cutByPlane plane faceNormal triangle =
 
         ( o1, o2, o3 ) =
             ( order d1, order d2, order d3 )
-
-        orderToNumber o =
-            case o of
-                EQ ->
-                    0
-
-                GT ->
-                    1
-
-                LT ->
-                    2
-
-        positioning =
-            Bitwise.or (orderToNumber o1) (orderToNumber o2)
-                |> Bitwise.or (orderToNumber o3)
 
         toPointInfo p d o =
             { point = p, distance = d, order = o }
@@ -409,7 +369,7 @@ clasify plane face =
         splittedFaces =
             firstTriangle
                 :: rest
-                |> List.map (cutByPlane plane planeNormal)
+                |> List.map (cutByPlane plane)
                 |> List.foldl (\result acc -> { acc | front = acc.front ++ result.front, back = acc.back ++ result.back }) { front = [], back = [] }
                 |> (\triangles ->
                         { front = fromTriangles faceNormal triangles.front
@@ -444,17 +404,9 @@ clasify plane face =
             Nothing
 
 
-clipByPlane : Plane3d Meters c -> Csg c -> Csg c
-clipByPlane plane csg =
-    case csg of
-        Primitive faces ->
-            faces
-                |> List.map (getFrontFaces plane)
-                |> List.concat
-                |> Primitive
-
-        _ ->
-            csg
+translate : Vector3d Meters c -> BspTree c -> BspTree c
+translate vector tree =
+    BspTree.translate vector tree
 
 
 getFrontFaces : Plane3d Meters c -> Face c -> List (Face c)
@@ -467,6 +419,22 @@ getFrontFaces plane face =
             [ faces.front ]
 
         Just (CoplanarFront f) ->
+            [ f ]
+
+        _ ->
+            []
+
+
+getBackFaces : Plane3d Meters c -> Face c -> List (Face c)
+getBackFaces plane face =
+    case clasify plane face of
+        Just (Back f) ->
+            [ f ]
+
+        Just (Spanning faces) ->
+            [ faces.back ]
+
+        Just (CoplanarBack f) ->
             [ f ]
 
         _ ->

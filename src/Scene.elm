@@ -184,10 +184,10 @@ view model =
             Csg.cube (Length.meters 1)
 
         split1 =
-            Csg.clipTest cube2 cube1
+            Csg.clipTest cube1 cube2
 
         split2 =
-            Csg.clipTest cube1 cube2
+            Csg.subtraction cube1 cube2
     in
     { title = "OrbitingCamera"
     , body =

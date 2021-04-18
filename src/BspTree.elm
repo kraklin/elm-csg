@@ -73,7 +73,7 @@ toFaces tree =
                     []
 
                 Node { faces, inside, outside } ->
-                    [ faces ] ++ traverse inside ++ traverse outside
+                    faces :: (traverse inside ++ traverse outside)
     in
     traverse tree
 
@@ -212,24 +212,44 @@ divide splittingPlane face =
            )
 
 
-clip : BspTree c -> BspTree c -> List (Face c)
+clip : BspTree c -> BspTree c -> BspTree c
 clip t1 t2 =
     t2
         |> toFaces
         |> List.filterMap (\f -> clipFace f t1)
+        |> build
+
+
+invert : BspTree c -> BspTree c
+invert tree =
+    let
+        invertTriangle triangle =
+            Triangle3d.vertices triangle
+                |> (\( v1, v2, v3 ) -> Triangle3d.from v3 v2 v1)
+
+        invertFace : Face c -> Face c
+        invertFace f =
+            { normal = Vector3d.minus f.normal Vector3d.zero
+            , triangles = Tuple.mapBoth invertTriangle (List.map invertTriangle) f.triangles
+            }
+    in
+    case tree of
+        Empty ->
+            Empty
+
+        Node nodeData ->
+            Node
+                { nodeData
+                    | faces = invertFace nodeData.faces
+                    , inside = invert nodeData.inside
+                    , outside = invert nodeData.outside
+                    , plane = Plane3d.flip nodeData.plane
+                }
 
 
 clipFace : Face c -> BspTree c -> Maybe (Face c)
 clipFace clippedFace clippingTree =
     let
-        maybePlane =
-            case clippingTree of
-                Empty ->
-                    Nothing
-
-                Node { plane } ->
-                    Just plane
-
         arePlanesSame treePlane face =
             case planeFromFace face of
                 Nothing ->
@@ -239,11 +259,6 @@ clipFace clippedFace clippingTree =
                     treePlane == plane
 
         combineFace ( maybeA, maybeB ) =
-            --TODO: check they have same normal and are coplanar
-            let
-                toList =
-                    Maybe.map allTriangles >> Maybe.withDefault []
-            in
             case ( maybeA, maybeB ) of
                 ( Nothing, Nothing ) ->
                     Nothing
@@ -371,6 +386,12 @@ numberToClass class =
             Spanning
 
 
+combineClasses : Classification -> Classification -> Classification
+combineClasses c1 c2 =
+    Bitwise.or (classToNumber c1) (classToNumber c2)
+        |> numberToClass
+
+
 classifyTriangle : Plane3d Meters c -> Triangle3d Meters c -> ClassifiedTriangle c
 classifyTriangle plane triangle =
     let
@@ -420,11 +441,6 @@ classifyTriangle plane triangle =
     , v2 = { point = v2, class = c2 }
     , v3 = { point = v3, class = c3 }
     }
-
-
-combineClasses c1 c2 =
-    Bitwise.or (classToNumber c1) (classToNumber c2)
-        |> numberToClass
 
 
 splitByPlane : Plane3d Meters c -> Triangle3d Meters c -> IntersectionResult c

@@ -90,8 +90,20 @@ simpleFace_ t =
 
 clipTest : BspTree c -> BspTree c -> BspTree c
 clipTest c1 c2 =
-    BspTree.clip c1 c2
-        |> BspTree.build
+    c1
+        |> BspTree.clip c2
+
+
+subtraction : BspTree c -> BspTree c -> BspTree c
+subtraction t1 t2 =
+    let
+        a =
+            t1
+                |> BspTree.invert
+                |> BspTree.clip t2
+    in
+    t2
+        |> BspTree.clip a
 
 
 cuboid : { width : Length.Length, height : Length.Length, depth : Length.Length } -> BspTree coordinates

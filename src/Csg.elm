@@ -106,6 +106,61 @@ subtraction t1 t2 =
         |> BspTree.clip a
 
 
+invert =
+    BspTree.invert
+
+
+pyramid : BspTree c
+pyramid =
+    let
+        v =
+            Point3d.meters 0 1 0
+
+        a =
+            Point3d.meters -1 0 1
+
+        b =
+            Point3d.meters 1 0 1
+
+        c =
+            Point3d.meters -1 0 -1
+
+        d =
+            Point3d.meters 1 0 -1
+
+        bottomNormal =
+            Vector3d.unitless 0 -1 0
+
+        frontNormal =
+            Vector3d.unitless 0 1 1
+
+        backNormal =
+            Vector3d.unitless 0 1 -1
+
+        leftNormal =
+            Vector3d.unitless -1 1 0
+
+        rightNormal =
+            Vector3d.unitless 1 1 0
+
+        front =
+            Face ( Triangle3d.from v a b, [] ) frontNormal
+
+        back =
+            Face ( Triangle3d.from v d c, [] ) backNormal
+
+        left =
+            Face ( Triangle3d.from v c a, [] ) leftNormal
+
+        right =
+            Face ( Triangle3d.from v b d, [] ) rightNormal
+
+        bottom =
+            Face ( Triangle3d.from a c d, [ Triangle3d.from d b a ] ) bottomNormal
+    in
+    BspTree.build [ front, back, bottom, left, right ]
+
+
 cuboid : { width : Length.Length, height : Length.Length, depth : Length.Length } -> BspTree coordinates
 cuboid { width, height, depth } =
     let

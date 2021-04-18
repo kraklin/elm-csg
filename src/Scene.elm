@@ -178,16 +178,21 @@ view model =
 
         cube1 =
             Csg.cube (Length.meters 1)
-                |> Csg.translate (Vector3d.meters model.clipPlanePosition -0.5 0.5)
+                |> Csg.translate (Vector3d.meters -0.5 model.clipPlanePosition 0.5)
 
         cube2 =
             Csg.cube (Length.meters 1)
 
         split1 =
-            Csg.clipTest cube1 cube2
+            Csg.subtraction (Csg.invert cube1) pyramid
 
         split2 =
-            Csg.subtraction cube1 cube2
+            Csg.subtraction pyramid cube1
+
+        pyramid =
+            Csg.pyramid
+
+        --Csg.sphere
     in
     { title = "OrbitingCamera"
     , body =
@@ -198,14 +203,22 @@ view model =
             , background = Scene3d.transparentBackground
             , entities =
                 [ originCross
+                , pyramid
+                    |> Csg.toLines
+                    |> Mesh.lineSegments
+                    |> Scene3d.mesh (Material.color Color.purple)
+
+                {--
                 , cube1
                     |> Csg.toLines
                     |> Mesh.lineSegments
                     |> Scene3d.mesh (Material.color Color.purple)
-                , cube2
-                    |> Csg.toLines
-                    |> Mesh.lineSegments
-                    |> Scene3d.mesh (Material.color Color.red)
+
+                      , cube2
+                          |> Csg.toLines
+                          |> Mesh.lineSegments
+                          |> Scene3d.mesh (Material.color Color.red)
+                ---}
                 , split1
                     |> Csg.toMesh
                     |> Mesh.indexedFaces
@@ -215,6 +228,7 @@ view model =
                     |> Mesh.indexedFaces
                     |> Scene3d.mesh (Material.matte Color.red)
 
+                ---}
                 --, Scene3d.mesh (Material.color Color.blue) clippedCubeBottom --cubesWireframe
                 ]
             , upDirection = Direction3d.positiveZ

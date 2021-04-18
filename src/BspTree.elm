@@ -1,8 +1,10 @@
 module BspTree exposing (..)
 
+import Bitwise
 import Dict
 import Direction3d exposing (Direction3d)
 import Length exposing (Meters)
+import List
 import Plane3d exposing (Plane3d)
 import Point3d exposing (Point3d)
 import Quantity exposing (Quantity, Unitless)
@@ -197,8 +199,7 @@ divide splittingPlane face =
                     Just { triangles = ( first, rest ), normal = face.normal }
     in
     allTriangles face
-        |> List.map (cutByPlane splittingPlane)
-        |> Debug.log "cuts"
+        |> List.map (splitByPlane splittingPlane)
         |> List.foldl
             (\{ front, back } acc ->
                 { inside = back ++ acc.inside
@@ -301,7 +302,6 @@ clipFace clippedFace clippingTree =
                             ( handleInside inside rootData.inside, handleOutside outside rootData.outside )
                                 |> combineFace
                        )
-                    |> Debug.log "result"
 
 
 dedup : List (Point3d Meters c) -> List (Point3d Meters c)
@@ -312,56 +312,164 @@ dedup list =
         |> Dict.values
 
 
-cutByPlane : Plane3d Meters c -> Triangle3d Meters c -> { front : List (Triangle3d Meters c), back : List (Triangle3d Meters c) }
-cutByPlane plane triangle =
+type alias IntersectionResult c =
+    { front : List (Triangle3d Meters c)
+    , back : List (Triangle3d Meters c)
+    }
+
+
+type Classification
+    = Coplanar
+    | Front
+    | Back
+    | Spanning
+
+
+type alias ClassifiedVertex c =
+    { point : Point3d Meters c
+    , class : Classification
+    }
+
+
+type alias ClassifiedTriangle c =
+    { v1 : ClassifiedVertex c
+    , v2 : ClassifiedVertex c
+    , v3 : ClassifiedVertex c
+    , class : Classification
+    }
+
+
+classToNumber : Classification -> Int
+classToNumber class =
+    case class of
+        Coplanar ->
+            0
+
+        Front ->
+            1
+
+        Back ->
+            2
+
+        Spanning ->
+            3
+
+
+numberToClass : Int -> Classification
+numberToClass class =
+    case class of
+        0 ->
+            Coplanar
+
+        1 ->
+            Front
+
+        2 ->
+            Back
+
+        _ ->
+            Spanning
+
+
+classifyTriangle : Plane3d Meters c -> Triangle3d Meters c -> ClassifiedTriangle c
+classifyTriangle plane triangle =
     let
+        ( v1, v2, v3 ) =
+            Triangle3d.vertices triangle
+
         planeNormal =
             Plane3d.normalDirection plane |> Direction3d.toVector
 
-        ( p1, p2, p3 ) =
-            Triangle3d.vertices triangle
+        ( vec1, vec2, vec3 ) =
+            ( Vector3d.from Point3d.origin v1
+            , Vector3d.from Point3d.origin v2
+            , Vector3d.from Point3d.origin v3
+            )
 
-        distanceFromPlane =
-            Point3d.signedDistanceFrom plane
+        w =
+            Vector3d.dot planeNormal (Vector3d.from Point3d.origin (Plane3d.originPoint plane))
 
-        order d =
-            Quantity.compare d Quantity.zero
+        t v =
+            -- var t = this.normal.dot(polygon.vertices[i].pos) - this.w;
+            Quantity.minus w (Vector3d.dot planeNormal v)
+                |> Quantity.compare Quantity.zero
+                |> (\result ->
+                        case result of
+                            LT ->
+                                Front
 
-        ( d1, d2, d3 ) =
-            ( distanceFromPlane p1, distanceFromPlane p2, distanceFromPlane p3 )
+                            GT ->
+                                Back
 
-        ( o1, o2, o3 ) =
-            ( order d1, order d2, order d3 )
+                            EQ ->
+                                Coplanar
+                   )
 
-        toPointInfo p d o =
-            { point = p, distance = d, order = o }
+        ( c1, c2, c3 ) =
+            ( t vec1
+            , t vec2
+            , t vec3
+            )
 
-        pa =
-            toPointInfo p1 d1 o1
+        combinedClasses =
+            combineClasses c1 c2
+                |> combineClasses c3
+    in
+    { class = combinedClasses
+    , v1 = { point = v1, class = c1 }
+    , v2 = { point = v2, class = c2 }
+    , v3 = { point = v3, class = c3 }
+    }
 
-        pb =
-            toPointInfo p2 d2 o2
 
-        pc =
-            toPointInfo p3 d3 o3
+combineClasses c1 c2 =
+    Bitwise.or (classToNumber c1) (classToNumber c2)
+        |> numberToClass
 
-        pairs =
-            [ ( pa, pb ), ( pa, pc ), ( pb, pc ) ]
 
-        onDifferentSides =
-            pairs |> List.filter (\( first, second ) -> first.order /= second.order)
+splitByPlane : Plane3d Meters c -> Triangle3d Meters c -> IntersectionResult c
+splitByPlane plane triangle =
+    let
+        classifiedTriangle =
+            classifyTriangle plane triangle
 
-        intersectionPoints =
-            onDifferentSides
-                |> List.map
-                    (\( a, b ) ->
+        ( v1, v2, v3 ) =
+            ( classifiedTriangle.v1
+            , classifiedTriangle.v2
+            , classifiedTriangle.v3
+            )
+    in
+    case classifiedTriangle.class of
+        Coplanar ->
+            let
+                flippedTriangle =
+                    Triangle3d.from
+                        classifiedTriangle.v3.point
+                        classifiedTriangle.v2.point
+                        classifiedTriangle.v1.point
+            in
+            { front = [ triangle ], back = [ flippedTriangle ] }
+
+        Front ->
+            { front = [ triangle ], back = [] }
+
+        Back ->
+            { front = [], back = [ triangle ] }
+
+        Spanning ->
+            let
+                planeNormal =
+                    Plane3d.normalDirection plane |> Direction3d.toVector
+
+                maybeSplitPoint ( t1, t2 ) =
+                    if combineClasses t1.class t2.class == Spanning then
                         let
                             va =
-                                Vector3d.from Point3d.origin a.point
+                                Vector3d.from Point3d.origin t1.point
 
                             --(this.w - this.normal.dot(vi.pos)) / this.normal.dot(vj.pos.minus(vi.pos));
                             vb =
-                                Vector3d.from Point3d.origin b.point
+                                Vector3d.from Point3d.origin t2.point
 
                             vba =
                                 Vector3d.minus vb va
@@ -372,60 +480,49 @@ cutByPlane plane triangle =
                             t =
                                 Quantity.ratio (Quantity.minus w (Vector3d.dot planeNormal va)) (Vector3d.dot planeNormal vba)
                         in
-                        Point3d.translateBy (Vector3d.interpolateFrom va vb t) Point3d.origin
-                    )
-                |> dedup
-
-        ( onFront, onBack ) =
-            ( [ pa, pb, pc ] |> List.filter (\p -> p.order == GT || p.order == EQ) |> List.map .point
-            , [ pa, pb, pc ] |> List.filter (\p -> p.order == LT) |> List.map .point
-            )
-
-        ( d1f, d2f, d3f ) =
-            ( Quantity.unwrap d1, Quantity.unwrap d2, Quantity.unwrap d3 )
-
-        makeTriangles points =
-            let
-                vectorLength a b =
-                    Vector3d.from a b |> Vector3d.length
-
-                sortPoints a i1 i2 =
-                    if vectorLength a i2 |> Quantity.greaterThan (vectorLength a i1) then
-                        ( i1, i2 )
+                        Just <| Point3d.translateBy (Vector3d.interpolateFrom va vb t) Point3d.origin
 
                     else
-                        ( i2, i1 )
+                        Nothing
+
+                maybeFrontPoint ( t1, _ ) =
+                    if t1.class == Front || t1.class == Coplanar then
+                        Just t1.point
+
+                    else
+                        Nothing
+
+                maybeBackPoint ( t1, _ ) =
+                    if t1.class == Back || t1.class == Coplanar then
+                        Just t1.point
+
+                    else
+                        Nothing
+
+                toTriangles points =
+                    case points of
+                        [ p1, p2, p3 ] ->
+                            [ Triangle3d.from p1 p2 p3 ]
+
+                        [ p1, p2, p3, p4 ] ->
+                            [ Triangle3d.from p1 p2 p3, Triangle3d.from p3 p4 p1 ]
+
+                        _ ->
+                            []
             in
-            Debug.log "make triangles" <|
-                case intersectionPoints of
-                    [ i1, i2 ] ->
-                        case points of
-                            [ onePoint ] ->
-                                [ Triangle3d.from onePoint i1 i2 ]
-
-                            [ firstPoint, secondPoint ] ->
-                                [ Triangle3d.from firstPoint (sortPoints firstPoint i1 i2 |> Tuple.first) (sortPoints firstPoint i1 i2 |> Tuple.second)
-                                , Triangle3d.from firstPoint (sortPoints firstPoint i1 i2 |> Tuple.second) secondPoint
-                                ]
-
-                            [ v1, v2, v3 ] ->
-                                [ Triangle3d.from v1 v2 v3 ]
-
-                            _ ->
-                                []
-
-                    rest ->
-                        let
-                            _ =
-                                Debug.log "intersection point" rest
-                        in
-                        []
-    in
-    if d1f > 0 && d2f > 0 && d3f > 0 then
-        { front = [ triangle ], back = [] }
-
-    else if d1f <= 0 && d2f <= 0 && d3f <= 0 then
-        { front = [], back = [ triangle ] }
-
-    else
-        { front = makeTriangles onFront, back = makeTriangles onBack }
+            [ ( v1, v2 ), ( v2, v3 ), ( v3, v1 ) ]
+                |> List.map
+                    (\tuple ->
+                        { front = [ maybeFrontPoint tuple, maybeSplitPoint tuple ] |> List.filterMap identity
+                        , back = [ maybeBackPoint tuple, maybeSplitPoint tuple ] |> List.filterMap identity
+                        }
+                    )
+                |> List.foldl
+                    (\{ front, back } acc ->
+                        { acc
+                            | front = acc.front ++ front
+                            , back = acc.back ++ back
+                        }
+                    )
+                    { front = [], back = [] }
+                |> (\{ front, back } -> { front = toTriangles front, back = toTriangles back })

@@ -166,6 +166,33 @@ renderCsg trianglesList =
         |> Scene3d.group
 
 
+cube1 t =
+    Csg.cube (Length.meters 1)
+        |> Csg.translate (Vector3d.meters -0.5 t 0.5)
+
+
+cube2 =
+    Csg.cube (Length.meters 1)
+
+
+split1 t =
+    Csg.subtraction (Csg.invert (cube1 t)) sphere
+        |> Csg.withColor Color.blue
+
+
+split2 t =
+    Csg.subtraction sphere (cube1 t)
+        |> Csg.withColor Color.green
+
+
+pyramid =
+    Csg.pyramid
+
+
+sphere =
+    Csg.sphere
+
+
 view : Model -> Browser.Document Msg
 view model =
     let
@@ -186,24 +213,6 @@ view model =
                 , verticalFieldOfView = Angle.degrees 30
                 }
 
-        cube1 =
-            Csg.cube (Length.meters 1)
-                |> Csg.translate (Vector3d.meters -0.5 model.clipPlanePosition 0.5)
-
-        cube2 =
-            Csg.cube (Length.meters 1)
-
-        split1 =
-            Csg.subtraction (Csg.invert cube1) pyramid
-                |> Csg.withColor Color.blue
-
-        split2 =
-            Csg.subtraction pyramid cube1
-                |> Csg.withColor Color.green
-
-        pyramid =
-            Csg.pyramid
-
         --Csg.sphere
     in
     { title = "OrbitingCamera"
@@ -218,22 +227,24 @@ view model =
 
                 --, renderCsg <| Csg.toMesh pyramid
                 {--
-                , cube1
+                , cube1 model.clipPlanePosition
                     |> Csg.toLines
                     |> Mesh.lineSegments
                     |> Scene3d.mesh (Material.color Color.purple)
-
-                      , cube2
-                          |> Csg.toLines
-                          |> Mesh.lineSegments
-                          |> Scene3d.mesh (Material.color Color.red)
-                ---}
-                , pyramid
+                , cube2
                     |> Csg.toLines
                     |> Mesh.lineSegments
                     |> Scene3d.mesh (Material.color Color.red)
-                , renderCsg <| Csg.toMesh split1
-                , renderCsg <| Csg.toMesh split2
+                --}
+                -- , renderCsg <| Csg.toMesh sphere
+                {-
+                   , sphere
+                       |> Csg.toLines
+                       |> Mesh.lineSegments
+                       |> Scene3d.mesh (Material.color Color.red)
+                -}
+                , renderCsg <| Csg.toMesh <| split1 model.clipPlanePosition
+                , renderCsg <| Csg.toMesh <| split2 model.clipPlanePosition
 
                 ---}
                 --, Scene3d.mesh (Material.color Color.blue) clippedCubeBottom --cubesWireframe

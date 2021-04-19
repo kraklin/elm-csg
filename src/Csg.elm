@@ -1,7 +1,10 @@
 module Csg exposing (..)
 
+import Angle
+import Axis3d
 import BspTree exposing (BspTree, Face)
 import Color exposing (Color)
+import Direction3d
 import Length exposing (Meters)
 import LineSegment3d exposing (LineSegment3d)
 import Point3d exposing (Point3d)
@@ -160,24 +163,134 @@ cuboid { width, height, depth } =
             Triangle3d.from
 
         front =
-            Face ( triangle a b c, [ triangle a c d ] ) frontNormal defaultColor
+            Face ( triangle a c b, [ triangle a d c ] ) frontNormal defaultColor
 
         back =
             Face ( triangle e f g, [ triangle e g h ] ) backNormal defaultColor
 
         top =
-            Face ( triangle b f g, [ triangle b g c ] ) topNormal defaultColor
+            Face ( triangle b g f, [ triangle b c g ] ) topNormal defaultColor
 
         bottom =
             Face ( triangle a e h, [ triangle a h d ] ) bottomNormal defaultColor
 
         left =
-            Face ( triangle e f b, [ triangle e b a ] ) leftNormal defaultColor
+            Face ( triangle e a b, [ triangle e b f ] ) leftNormal defaultColor
 
         right =
-            Face ( triangle d c g, [ triangle d g h ] ) rightNormal defaultColor
+            Face ( triangle d h g, [ triangle d g c ] ) rightNormal defaultColor
     in
     BspTree.build [ front, back, top, bottom, left, right ]
+        |> Csg
+
+
+sphere : Csg c
+sphere =
+    sphereWith 16
+
+
+sphereWith : Int -> Csg c
+sphereWith slices =
+    let
+        stacks =
+            8
+
+        radius =
+            0.7
+
+        north =
+            Point3d.meters 0 radius 0
+
+        south =
+            Point3d.meters 0 -radius 0
+
+        deltaTheta =
+            Angle.turns (0.5 / stacks)
+
+        deltaPhi =
+            Angle.turns (1 / toFloat slices)
+
+        northFirst =
+            Point3d.rotateAround Axis3d.x deltaTheta north
+
+        southFirst =
+            Point3d.rotateAround Axis3d.x (Quantity.multiplyBy (stacks - 1) deltaTheta) north
+
+        slicesFloat =
+            toFloat slices
+
+        indices =
+            List.range 1 (stacks - 2)
+                |> List.map
+                    (\latId ->
+                        List.range 0 (slices - 1)
+                            |> List.map
+                                (\long -> { i1 = ( latId, long ), i2 = ( latId + 1, long ), i3 = ( latId, long + 1 ), i4 = ( latId + 1, long + 1 ) })
+                    )
+                |> List.concat
+
+        poleTriangles =
+            List.range 0 (slices - 1)
+                |> List.map (\i -> ( toFloat i, toFloat (i + 1) ))
+                |> List.map
+                    (\( firstIdx, secondIdx ) ->
+                        let
+                            axis =
+                                Axis3d.y
+
+                            angleFirst =
+                                Angle.turns (firstIdx / slicesFloat)
+
+                            angleSecond =
+                                Angle.turns (secondIdx / slicesFloat)
+                        in
+                        [ Triangle3d.from
+                            north
+                            (Point3d.rotateAround axis angleFirst northFirst)
+                            (Point3d.rotateAround axis angleSecond northFirst)
+                        , Triangle3d.from
+                            (Point3d.rotateAround axis angleFirst southFirst)
+                            south
+                            (Point3d.rotateAround axis angleSecond southFirst)
+                        ]
+                    )
+                |> List.concat
+                |> List.filterMap toFace
+
+        toFace tri =
+            let
+                maybeNormal =
+                    tri
+                        |> Triangle3d.normalDirection
+                        |> Maybe.map (\dir -> Direction3d.toVector dir)
+            in
+            maybeNormal
+                |> Maybe.map
+                    (\normal ->
+                        Face ( tri, [] )
+                            normal
+                            defaultColor
+                    )
+
+        vertex ( it, ip ) =
+            north
+                |> Point3d.rotateAround Axis3d.x (Quantity.multiplyBy (toFloat it) deltaTheta)
+                |> Point3d.rotateAround Axis3d.y (Quantity.multiplyBy (toFloat ip) deltaPhi)
+
+        strip =
+            indices
+                |> List.map
+                    (\idx ->
+                        [ Triangle3d.from (vertex idx.i1) (vertex idx.i2) (vertex idx.i3)
+                        , Triangle3d.from (vertex idx.i2) (vertex idx.i4) (vertex idx.i3)
+                        ]
+                    )
+                |> List.concat
+                |> List.filterMap toFace
+    in
+    poleTriangles
+        ++ strip
+        |> BspTree.build
         |> Csg
 
 
@@ -262,13 +375,27 @@ toMesh (Csg tree) =
 toLines : Csg coordinates -> List (LineSegment3d Length.Meters coordinates)
 toLines (Csg tree) =
     let
+        centroid : Triangle c -> Point3d Meters c
+        centroid ( v1, v2, v3 ) =
+            Point3d.centroid3 v1.position v2.position v3.position
+
+        normalEnd : Triangle c -> Point3d Meters c
+        normalEnd ( v1, v2, v3 ) =
+            Point3d.translateBy
+                (Vector3d.toUnitless v1.normal
+                    |> Vector3d.fromMeters
+                )
+                (centroid ( v1, v2, v3 ))
+
         triangleSegments ( v1, v2, v3 ) =
             [ LineSegment3d.from v1.position v2.position
             , LineSegment3d.from v2.position v3.position
             , LineSegment3d.from v3.position v1.position
+            , LineSegment3d.from (centroid ( v1, v2, v3 )) (normalEnd ( v1, v2, v3 ))
             ]
     in
-    BspTree.toFaces tree
+    tree
+        |> BspTree.toFaces
         |> List.map facesToTriangles
         |> List.concat
         |> List.map triangleSegments

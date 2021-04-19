@@ -190,15 +190,37 @@ divide : Plane3d Meters c -> Face c -> { inside : Maybe (Face c), outside : Mayb
 divide splittingPlane face =
     let
         createFace triangles =
-            case triangles of
+            let
+                getNormals triangle =
+                    Triangle3d.normalDirection triangle
+                        |> Maybe.map (\normal -> ( triangle, Direction3d.toVector normal ))
+
+                trianglesWithNormal =
+                    triangles |> List.map getNormals
+            in
+            case trianglesWithNormal of
                 [] ->
                     Nothing
 
-                [ one ] ->
-                    Just { color = face.color, triangles = ( one, [] ), normal = face.normal }
+                [ maybeOne ] ->
+                    maybeOne
+                        |> Maybe.map
+                            (\one ->
+                                { color = face.color, triangles = ( Tuple.first one, [] ), normal = Tuple.second one }
+                            )
 
-                first :: rest ->
-                    Just { color = face.color, triangles = ( first, rest ), normal = face.normal }
+                maybeFirst :: rest ->
+                    maybeFirst
+                        |> Maybe.map
+                            (\first ->
+                                { color = face.color
+                                , triangles =
+                                    ( Tuple.first first
+                                    , List.filterMap (Maybe.map Tuple.first) rest
+                                    )
+                                , normal = Tuple.second first
+                                }
+                            )
     in
     allTriangles face
         |> List.map (splitByPlane splittingPlane)
@@ -395,6 +417,10 @@ combineClasses c1 c2 =
         |> numberToClass
 
 
+epsilon =
+    1.0e-5
+
+
 classifyTriangle : Plane3d Meters c -> Triangle3d Meters c -> ClassifiedTriangle c
 classifyTriangle plane triangle =
     let
@@ -415,17 +441,16 @@ classifyTriangle plane triangle =
 
         t v =
             Quantity.minus w (Vector3d.dot planeNormal v)
-                |> Quantity.compare Quantity.zero
+                |> Quantity.unwrap
                 |> (\result ->
-                        case result of
-                            LT ->
-                                Front
+                        if result < -epsilon then
+                            Back
 
-                            GT ->
-                                Back
+                        else if result > epsilon then
+                            Front
 
-                            EQ ->
-                                Coplanar
+                        else
+                            Coplanar
                    )
 
         ( c1, c2, c3 ) =
@@ -456,17 +481,30 @@ splitByPlane plane triangle =
             , classifiedTriangle.v2
             , classifiedTriangle.v3
             )
+
+        maybeIsFront tri =
+            Triangle3d.normalDirection tri
+                |> Maybe.map
+                    (Direction3d.toVector
+                        >> Vector3d.dot
+                            (Plane3d.normalDirection plane
+                                |> Direction3d.toVector
+                            )
+                        >> Quantity.greaterThan Quantity.zero
+                    )
     in
     case classifiedTriangle.class of
         Coplanar ->
-            let
-                flippedTriangle =
-                    Triangle3d.from
-                        classifiedTriangle.v3.point
-                        classifiedTriangle.v2.point
-                        classifiedTriangle.v1.point
-            in
-            { front = [ triangle ], back = [ flippedTriangle ] }
+            case maybeIsFront triangle of
+                Nothing ->
+                    { front = [], back = [] }
+
+                Just isFront ->
+                    if isFront then
+                        { front = [ triangle ], back = [] }
+
+                    else
+                        { front = [], back = [ triangle ] }
 
         Front ->
             { front = [ triangle ], back = [] }

@@ -1,6 +1,7 @@
 module BspTree exposing (..)
 
 import Bitwise
+import Color exposing (Color)
 import Dict
 import Direction3d exposing (Direction3d)
 import Length exposing (Meters)
@@ -15,6 +16,7 @@ import Vector3d exposing (Vector3d)
 type alias Face coordinates =
     { triangles : ( Triangle3d Meters coordinates, List (Triangle3d Meters coordinates) )
     , normal : Vector3d Unitless coordinates
+    , color : Color
     }
 
 
@@ -78,14 +80,14 @@ toFaces tree =
     traverse tree
 
 
-fromTriangles : Vector3d Unitless coordinates -> List (Triangle3d Meters coordinates) -> Maybe (Face coordinates)
-fromTriangles normal triangles =
+fromTriangles : Vector3d Unitless coordinates -> Color -> List (Triangle3d Meters coordinates) -> Maybe (Face coordinates)
+fromTriangles normal color triangles =
     case triangles of
         [] ->
             Nothing
 
         first :: rest ->
-            Just <| { triangles = ( first, rest ), normal = normal }
+            Just <| { color = color, triangles = ( first, rest ), normal = normal }
 
 
 mapFaces : (Face c -> Face c) -> BspTree c -> BspTree c
@@ -113,7 +115,7 @@ translate vector tree =
         translateFace f =
             allTriangles f
                 |> List.map (Triangle3d.translateBy vector)
-                |> fromTriangles f.normal
+                |> fromTriangles f.normal f.color
                 |> Maybe.withDefault f
     in
     case tree of
@@ -193,10 +195,10 @@ divide splittingPlane face =
                     Nothing
 
                 [ one ] ->
-                    Just { triangles = ( one, [] ), normal = face.normal }
+                    Just { color = face.color, triangles = ( one, [] ), normal = face.normal }
 
                 first :: rest ->
-                    Just { triangles = ( first, rest ), normal = face.normal }
+                    Just { color = face.color, triangles = ( first, rest ), normal = face.normal }
     in
     allTriangles face
         |> List.map (splitByPlane splittingPlane)
@@ -229,8 +231,9 @@ invert tree =
 
         invertFace : Face c -> Face c
         invertFace f =
-            { normal = Vector3d.minus f.normal Vector3d.zero
-            , triangles = Tuple.mapBoth invertTriangle (List.map invertTriangle) f.triangles
+            { f
+                | normal = Vector3d.minus f.normal Vector3d.zero
+                , triangles = Tuple.mapBoth invertTriangle (List.map invertTriangle) f.triangles
             }
     in
     case tree of
@@ -275,7 +278,7 @@ clipFace clippedFace clippingTree =
                             Nothing
 
                         first :: rest ->
-                            Just { triangles = ( first, rest ), normal = b.normal }
+                            Just { color = b.color, triangles = ( first, rest ), normal = b.normal }
 
         handleInside : Maybe (Face c) -> BspTree c -> Maybe (Face c)
         handleInside maybeFace tree =
@@ -411,7 +414,6 @@ classifyTriangle plane triangle =
             Vector3d.dot planeNormal (Vector3d.from Point3d.origin (Plane3d.originPoint plane))
 
         t v =
-            -- var t = this.normal.dot(polygon.vertices[i].pos) - this.w;
             Quantity.minus w (Vector3d.dot planeNormal v)
                 |> Quantity.compare Quantity.zero
                 |> (\result ->
@@ -483,7 +485,6 @@ splitByPlane plane triangle =
                             va =
                                 Vector3d.from Point3d.origin t1.point
 
-                            --(this.w - this.normal.dot(vi.pos)) / this.normal.dot(vj.pos.minus(vi.pos));
                             vb =
                                 Vector3d.from Point3d.origin t2.point
 

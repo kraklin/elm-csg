@@ -156,6 +156,16 @@ subscriptions model =
         Browser.Events.onMouseDown (Decode.succeed MouseDown)
 
 
+renderCsg trianglesList =
+    trianglesList
+        |> List.map
+            (\( v1, v2, v3 ) ->
+                Triangle3d.from v1.position v2.position v3.position
+                    |> Scene3d.facet (Material.matte v1.color)
+            )
+        |> Scene3d.group
+
+
 view : Model -> Browser.Document Msg
 view model =
     let
@@ -185,9 +195,11 @@ view model =
 
         split1 =
             Csg.subtraction (Csg.invert cube1) pyramid
+                |> Csg.withColor Color.blue
 
         split2 =
             Csg.subtraction pyramid cube1
+                |> Csg.withColor Color.green
 
         pyramid =
             Csg.pyramid
@@ -203,11 +215,8 @@ view model =
             , background = Scene3d.transparentBackground
             , entities =
                 [ originCross
-                , pyramid
-                    |> Csg.toLines
-                    |> Mesh.lineSegments
-                    |> Scene3d.mesh (Material.color Color.purple)
 
+                --, renderCsg <| Csg.toMesh pyramid
                 {--
                 , cube1
                     |> Csg.toLines
@@ -219,14 +228,12 @@ view model =
                           |> Mesh.lineSegments
                           |> Scene3d.mesh (Material.color Color.red)
                 ---}
-                , split1
-                    |> Csg.toMesh
-                    |> Mesh.indexedFaces
-                    |> Scene3d.mesh (Material.matte Color.purple)
-                , split2
-                    |> Csg.toMesh
-                    |> Mesh.indexedFaces
-                    |> Scene3d.mesh (Material.matte Color.red)
+                , pyramid
+                    |> Csg.toLines
+                    |> Mesh.lineSegments
+                    |> Scene3d.mesh (Material.color Color.red)
+                , renderCsg <| Csg.toMesh split1
+                , renderCsg <| Csg.toMesh split2
 
                 ---}
                 --, Scene3d.mesh (Material.color Color.blue) clippedCubeBottom --cubesWireframe

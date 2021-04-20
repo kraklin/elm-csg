@@ -186,76 +186,99 @@ cuboid { width, height, depth } =
 
 sphere : Csg c
 sphere =
-    sphereWith 16
+    sphereWith 16 8 0.7
 
 
-sphereWith : Int -> Csg c
-sphereWith slices =
+sphereWith : Int -> Int -> Float -> Csg c
+sphereWith slices stacks radius =
     let
-        stacks =
-            8
+        stacks_ =
+            if stacks < 2 then
+                2
 
-        radius =
-            0.7
+            else
+                stacks
 
-        north =
-            Point3d.meters 0 radius 0
+        slices_ =
+            if slices < 3 then
+                3
 
-        south =
-            Point3d.meters 0 -radius 0
+            else
+                slices
 
         deltaTheta =
-            Angle.turns (0.5 / stacks)
+            Angle.turns (0.5 / toFloat stacks_)
 
         deltaPhi =
-            Angle.turns (1 / toFloat slices)
+            Angle.turns (1 / toFloat slices_)
 
-        northFirst =
-            Point3d.rotateAround Axis3d.x deltaTheta north
+        northPoint =
+            Point3d.meters 0 radius 0
 
-        southFirst =
-            Point3d.rotateAround Axis3d.x (Quantity.multiplyBy (stacks - 1) deltaTheta) north
+        vertex ( it, ip ) =
+            northPoint
+                |> Point3d.rotateAround Axis3d.x (Quantity.multiplyBy (toFloat it) deltaTheta)
+                |> Point3d.rotateAround Axis3d.y (Quantity.multiplyBy (toFloat ip) deltaPhi)
 
-        slicesFloat =
-            toFloat slices
-
-        indices =
-            List.range 1 (stacks - 2)
+        triangles =
+            List.range 1 (stacks_ - 2)
                 |> List.map
                     (\latId ->
-                        List.range 0 (slices - 1)
+                        List.range 0 (slices_ - 1)
                             |> List.map
-                                (\long -> { i1 = ( latId, long ), i2 = ( latId + 1, long ), i3 = ( latId, long + 1 ), i4 = ( latId + 1, long + 1 ) })
+                                (\long ->
+                                    { i1 = vertex ( latId, long )
+                                    , i2 = vertex ( latId + 1, long )
+                                    , i3 = vertex ( latId, long + 1 )
+                                    , i4 = vertex ( latId + 1, long + 1 )
+                                    }
+                                )
                     )
                 |> List.concat
-
-        poleTriangles =
-            List.range 0 (slices - 1)
-                |> List.map (\i -> ( toFloat i, toFloat (i + 1) ))
                 |> List.map
-                    (\( firstIdx, secondIdx ) ->
-                        let
-                            axis =
-                                Axis3d.y
-
-                            angleFirst =
-                                Angle.turns (firstIdx / slicesFloat)
-
-                            angleSecond =
-                                Angle.turns (secondIdx / slicesFloat)
-                        in
-                        [ Triangle3d.from
-                            north
-                            (Point3d.rotateAround axis angleFirst northFirst)
-                            (Point3d.rotateAround axis angleSecond northFirst)
-                        , Triangle3d.from
-                            (Point3d.rotateAround axis angleFirst southFirst)
-                            south
-                            (Point3d.rotateAround axis angleSecond southFirst)
+                    (\idx ->
+                        [ Triangle3d.from idx.i1 idx.i2 idx.i3
+                        , Triangle3d.from idx.i2 idx.i4 idx.i3
                         ]
                     )
                 |> List.concat
                 |> List.filterMap toFace
+
+        northCap =
+            List.range 0 (slices_ - 1)
+                |> List.filterMap
+                    (\long ->
+                        let
+                            i1 =
+                                northPoint
+
+                            i2 =
+                                vertex ( 1, long )
+
+                            i3 =
+                                vertex ( 1, long + 1 )
+                        in
+                        Triangle3d.from i1 i2 i3
+                            |> toFace
+                    )
+
+        southCap =
+            List.range 0 (slices_ - 1)
+                |> List.filterMap
+                    (\long ->
+                        let
+                            i1 =
+                                vertex ( stacks_ - 1, long )
+
+                            i2 =
+                                vertex ( stacks_, long )
+
+                            i3 =
+                                vertex ( stacks_ - 1, long + 1 )
+                        in
+                        Triangle3d.from i1 i2 i3
+                            |> toFace
+                    )
 
         toFace tri =
             let
@@ -271,25 +294,8 @@ sphereWith slices =
                             normal
                             defaultColor
                     )
-
-        vertex ( it, ip ) =
-            north
-                |> Point3d.rotateAround Axis3d.x (Quantity.multiplyBy (toFloat it) deltaTheta)
-                |> Point3d.rotateAround Axis3d.y (Quantity.multiplyBy (toFloat ip) deltaPhi)
-
-        strip =
-            indices
-                |> List.map
-                    (\idx ->
-                        [ Triangle3d.from (vertex idx.i1) (vertex idx.i2) (vertex idx.i3)
-                        , Triangle3d.from (vertex idx.i2) (vertex idx.i4) (vertex idx.i3)
-                        ]
-                    )
-                |> List.concat
-                |> List.filterMap toFace
     in
-    poleTriangles
-        ++ strip
+    (northCap ++ triangles ++ southCap)
         |> BspTree.build
         |> Csg
 
@@ -298,16 +304,88 @@ sphereWith slices =
 -- Operations
 
 
-subtraction : Csg c -> Csg c -> Csg c
-subtraction (Csg t1) (Csg t2) =
+subtract : Csg c -> Csg c -> Csg c
+subtract (Csg t1) (Csg t2) =
     let
         a =
             t1
                 |> BspTree.invert
                 |> BspTree.clip t2
+
+        b =
+            t2
+                |> BspTree.clip a
+                |> BspTree.toFaces
     in
-    t2
-        |> BspTree.clip a
+    (BspTree.toFaces a ++ b)
+        |> BspTree.build
+        |> Csg
+
+
+intersect : Csg c -> Csg c -> Csg c
+intersect (Csg a) (Csg b) =
+    {-
+       intersect: function(csg) {
+          var a = new CSG.Node(this.clone().polygons);
+          var b = new CSG.Node(csg.clone().polygons);
+          a.invert();
+          b.clipTo(a);
+          b.invert();
+          a.clipTo(b);
+          b.clipTo(a);
+          a.build(b.allPolygons());
+          a.invert();
+          return CSG.fromPolygons(a.allPolygons());
+        },
+
+    -}
+    let
+        t1 =
+            a
+                |> BspTree.invert
+                |> BspTree.clip b
+                |> BspTree.invert
+                |> BspTree.toFaces
+
+        t2 =
+            b
+                |> BspTree.invert
+                |> BspTree.clip a
+                |> BspTree.invert
+                |> BspTree.toFaces
+    in
+    BspTree.build (t1 ++ t2)
+        |> Csg
+
+
+union : Csg c -> Csg c -> Csg c
+union (Csg t1) (Csg t2) =
+    let
+        a_ =
+            t1
+                |> BspTree.invert
+                |> BspTree.clip t2
+
+        b =
+            t2
+                |> BspTree.clip
+                    (t1
+                        |> BspTree.invert
+                        |> BspTree.clip t2
+                    )
+                |> BspTree.toFaces
+
+        a =
+            t1
+                |> BspTree.clip
+                    (t2
+                        |> BspTree.invert
+                        |> BspTree.clip t1
+                    )
+                |> BspTree.toFaces
+    in
+    (a ++ b)
+        |> BspTree.build
         |> Csg
 
 

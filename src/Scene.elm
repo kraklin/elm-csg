@@ -74,7 +74,7 @@ init () =
     ( { azimuth = Angle.degrees 45
       , elevation = Angle.degrees 30
       , orbiting = False
-      , clipPlanePosition = 0.2
+      , clipPlanePosition = -0.5
       , mesh1 = mesh1
       , mesh2 = mesh2
       }
@@ -166,23 +166,34 @@ renderCsg trianglesList =
         |> Scene3d.group
 
 
-cube1 t =
+cube1 =
     Csg.cube (Length.meters 1)
-        |> Csg.translate (Vector3d.meters -0.5 t 0.5)
+        |> Csg.translate (Vector3d.meters -0.5 -0.5 0.5)
+        |> Csg.withColor Color.blue
 
 
 cube2 =
     Csg.cube (Length.meters 1)
+        |> Csg.withColor Color.red
 
 
-split1 t =
-    Csg.subtraction (Csg.invert (cube1 t)) sphere
-        |> Csg.withColor Color.blue
+split1 =
+    Csg.subtract sphere cube2
 
 
-split2 t =
-    Csg.subtraction sphere (cube1 t)
-        |> Csg.withColor Color.green
+
+-- |> Csg.withColor Color.blue
+
+
+split2 =
+    Csg.intersect cube1 sphere
+        |> Csg.intersect cube2
+        |> Csg.toMesh
+        |> renderCsg
+
+
+union =
+    Csg.intersect cube1 cube2
 
 
 pyramid =
@@ -191,6 +202,7 @@ pyramid =
 
 sphere =
     Csg.sphere
+        |> Csg.withColor Color.green
 
 
 view : Model -> Browser.Document Msg
@@ -227,24 +239,35 @@ view model =
 
                 --, renderCsg <| Csg.toMesh pyramid
                 {--
-                , cube1 model.clipPlanePosition
+                , cube1
                     |> Csg.toLines
                     |> Mesh.lineSegments
                     |> Scene3d.mesh (Material.color Color.purple)
+
+                --}
+                {--
                 , cube2
                     |> Csg.toLines
                     |> Mesh.lineSegments
                     |> Scene3d.mesh (Material.color Color.red)
+
                 --}
-                -- , renderCsg <| Csg.toMesh sphere
-                {-
-                   , sphere
-                       |> Csg.toLines
-                       |> Mesh.lineSegments
-                       |> Scene3d.mesh (Material.color Color.red)
-                -}
-                , renderCsg <| Csg.toMesh <| split1 model.clipPlanePosition
-                , renderCsg <| Csg.toMesh <| split2 model.clipPlanePosition
+                --, renderCsg <| Csg.toMesh sphere
+                {--, sphere
+                    |> Csg.toLines
+                    |> Mesh.lineSegments
+                    |> Scene3d.mesh (Material.color Color.red)
+
+                --}
+                {--
+                , renderCsg <| Csg.toMesh split1
+
+                --}
+                --{--
+                , split1
+                    |> Csg.toLines
+                    |> Mesh.lineSegments
+                    |> Scene3d.mesh (Material.color Color.green)
 
                 ---}
                 --, Scene3d.mesh (Material.color Color.blue) clippedCubeBottom --cubesWireframe

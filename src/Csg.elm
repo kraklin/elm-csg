@@ -5,11 +5,11 @@ import Axis3d
 import BspTree exposing (BspTree, Face)
 import Color exposing (Color)
 import Direction3d
-import Length exposing (Meters)
+import Length exposing (Length, Meters)
 import LineSegment3d exposing (LineSegment3d)
 import Point3d exposing (Point3d)
 import Quantity exposing (Unitless)
-import Triangle3d
+import Triangle3d exposing (Triangle3d)
 import Vector3d exposing (Vector3d)
 
 
@@ -24,6 +24,37 @@ type Csg c
 defaultColor : Color
 defaultColor =
     Color.yellow
+
+
+toFace : List (Triangle3d Meters c) -> Maybe (Face c)
+toFace triangles =
+    let
+        maybeNormal tri =
+            tri
+                |> Triangle3d.normalDirection
+                |> Maybe.map (\dir -> Direction3d.toVector dir)
+    in
+    case triangles of
+        [] ->
+            Nothing
+
+        [ triangle ] ->
+            maybeNormal triangle
+                |> Maybe.map
+                    (\normal ->
+                        Face ( triangle, [] )
+                            normal
+                            defaultColor
+                    )
+
+        first :: rest ->
+            maybeNormal first
+                |> Maybe.map
+                    (\normal ->
+                        Face ( first, rest )
+                            normal
+                            defaultColor
+                    )
 
 
 
@@ -106,12 +137,12 @@ pyramid =
         |> Csg
 
 
-cube : Length.Length -> Csg coordinates
+cube : Length -> Csg coordinates
 cube size =
     cuboid { width = size, height = size, depth = size }
 
 
-cuboid : { width : Length.Length, height : Length.Length, depth : Length.Length } -> Csg coordinates
+cuboid : { width : Length, height : Length, depth : Length } -> Csg coordinates
 cuboid { width, height, depth } =
     let
         z =
@@ -184,13 +215,26 @@ cuboid { width, height, depth } =
         |> Csg
 
 
-sphere : Csg c
+type alias SphereSettings =
+    { slices : Int
+    , stacks : Int
+    }
+
+
+sphereDefaults : SphereSettings
+sphereDefaults =
+    { slices = 12
+    , stacks = 8
+    }
+
+
+sphere : Length -> Csg c
 sphere =
-    sphereWith 16 8 0.7
+    sphereWith sphereDefaults
 
 
-sphereWith : Int -> Int -> Float -> Csg c
-sphereWith slices stacks radius =
+sphereWith : SphereSettings -> Length -> Csg c
+sphereWith { slices, stacks } radius =
     let
         stacks_ =
             if stacks < 2 then
@@ -213,7 +257,7 @@ sphereWith slices stacks radius =
             Angle.turns (1 / toFloat slices_)
 
         northPoint =
-            Point3d.meters 0 radius 0
+            Point3d.xyz (Length.meters 0) radius (Length.meters 0)
 
         vertex ( it, ip ) =
             northPoint
@@ -241,7 +285,6 @@ sphereWith slices stacks radius =
                         , Triangle3d.from idx.i2 idx.i4 idx.i3
                         ]
                     )
-                |> List.concat
                 |> List.filterMap toFace
 
         northCap =
@@ -259,6 +302,7 @@ sphereWith slices stacks radius =
                                 vertex ( 1, long + 1 )
                         in
                         Triangle3d.from i1 i2 i3
+                            |> List.singleton
                             |> toFace
                     )
 
@@ -277,25 +321,90 @@ sphereWith slices stacks radius =
                                 vertex ( stacks_ - 1, long + 1 )
                         in
                         Triangle3d.from i1 i2 i3
+                            |> List.singleton
                             |> toFace
-                    )
-
-        toFace tri =
-            let
-                maybeNormal =
-                    tri
-                        |> Triangle3d.normalDirection
-                        |> Maybe.map (\dir -> Direction3d.toVector dir)
-            in
-            maybeNormal
-                |> Maybe.map
-                    (\normal ->
-                        Face ( tri, [] )
-                            normal
-                            defaultColor
                     )
     in
     (northCap ++ triangles ++ southCap)
+        |> BspTree.build
+        |> Csg
+
+
+cylinder : Length -> Point3d Meters c -> Point3d Meters c -> Csg c
+cylinder radius start end =
+    let
+        slices =
+            12
+
+        vector =
+            Vector3d.from start end
+
+        initialPoint =
+            Point3d.translateBy
+                (Vector3d.perpendicularTo vector
+                    |> Vector3d.scaleTo radius
+                )
+                start
+
+        deltaPhi =
+            Angle.turns (1 / toFloat slices)
+
+        maybeRotationAxis =
+            Vector3d.direction vector
+                |> Maybe.map (Axis3d.through start)
+
+        bottomPoints =
+            List.range 0 (slices - 1)
+                |> List.filterMap
+                    (\idx ->
+                        maybeRotationAxis
+                            |> Maybe.map
+                                (\axis ->
+                                    ( Point3d.rotateAround axis (Quantity.multiplyBy (toFloat idx) deltaPhi) initialPoint
+                                    , Point3d.rotateAround axis (Quantity.multiplyBy (toFloat (idx + 1)) deltaPhi) initialPoint
+                                    )
+                                )
+                    )
+
+        topPoints =
+            bottomPoints
+                |> List.map
+                    (\( p1, p2 ) ->
+                        ( Point3d.translateBy vector p1
+                        , Point3d.translateBy vector p2
+                        )
+                    )
+
+        bottom =
+            bottomPoints
+                |> List.filterMap
+                    (\( p1, p2 ) ->
+                        Triangle3d.from p1 start p2
+                            |> List.singleton
+                            |> toFace
+                    )
+
+        top =
+            topPoints
+                |> List.filterMap
+                    (\( p1, p2 ) ->
+                        Triangle3d.from p1 p2 end
+                            |> List.singleton
+                            |> toFace
+                    )
+
+        sides =
+            List.map2
+                (\( b1, b2 ) ( t1, t2 ) ->
+                    [ Triangle3d.from b1 b2 t2
+                    , Triangle3d.from t1 b1 t2
+                    ]
+                )
+                bottomPoints
+                topPoints
+                |> List.filterMap toFace
+    in
+    (bottom ++ sides ++ top)
         |> BspTree.build
         |> Csg
 

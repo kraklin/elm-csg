@@ -166,10 +166,10 @@ renderCsg trianglesList =
         |> Scene3d.group
 
 
-cube1 =
+cube =
     Csg.cube (Length.meters 1)
         |> Csg.translate (Vector3d.meters -0.5 -0.5 0.5)
-        |> Csg.withColor Color.blue
+        |> Csg.withColor Color.red
 
 
 cube2 =
@@ -185,15 +185,49 @@ split1 =
 -- |> Csg.withColor Color.blue
 
 
-split2 =
-    Csg.intersect cube1 sphere
-        |> Csg.intersect cube2
+cylinderY =
+    Csg.cylinder (Length.centimeters 40) (Point3d.meters 0 -1 0) (Point3d.meters 0 1 0)
+        |> Csg.withColor Color.purple
+
+
+cylinderX =
+    Csg.cylinder (Length.centimeters 40) (Point3d.meters -1 0 0) (Point3d.meters 1 0 0)
+        |> Csg.withColor Color.purple
+
+
+cylinderZ =
+    Csg.cylinder (Length.centimeters 40) (Point3d.meters 0 0 -1) (Point3d.meters 0 0 1)
+
+
+final =
+    let
+        cylinders =
+            cylinderX
+                |> Csg.union cylinderY
+                |> Csg.union cylinderZ
+                |> Csg.withColor Color.green
+    in
+    cube
+        |> Csg.intersect sphere
+        |> Csg.subtract cylinders
+
+
+finalMesh =
+    final
         |> Csg.toMesh
         |> renderCsg
 
 
+trianglesCount =
+    final |> Csg.toMesh |> List.length
+
+
+
+--|> Csg.subtract cylinder
+
+
 union =
-    Csg.intersect cube1 cube2
+    Csg.intersect cube cube2
 
 
 pyramid =
@@ -201,8 +235,8 @@ pyramid =
 
 
 sphere =
-    Csg.sphere
-        |> Csg.withColor Color.green
+    Csg.sphere (Length.centimeters 70)
+        |> Csg.withColor Color.blue
 
 
 view : Model -> Browser.Document Msg
@@ -213,7 +247,7 @@ view model =
         -- towards positive Y
         viewpoint =
             Viewpoint3d.orbitZ
-                { focalPoint = Point3d.meters 0.5 0.5 0
+                { focalPoint = Point3d.meters 0 0 0
                 , azimuth = model.azimuth
                 , elevation = model.elevation
                 , distance = Length.meters 5
@@ -229,11 +263,13 @@ view model =
     in
     { title = "OrbitingCamera"
     , body =
-        [ Scene3d.cloudy
+        [ Scene3d.sunny
             { camera = camera
             , clipDepth = Length.meters 0.1
             , dimensions = ( Pixels.int 400, Pixels.int 300 )
             , background = Scene3d.transparentBackground
+            , shadows = False
+            , sunlightDirection = Direction3d.y
             , entities =
                 [ originCross
 
@@ -264,10 +300,7 @@ view model =
 
                 --}
                 --{--
-                , split1
-                    |> Csg.toLines
-                    |> Mesh.lineSegments
-                    |> Scene3d.mesh (Material.color Color.green)
+                , finalMesh
 
                 ---}
                 --, Scene3d.mesh (Material.color Color.blue) clippedCubeBottom --cubesWireframe
@@ -283,6 +316,7 @@ view model =
             , Events.onInput PlanePositionChanged
             ]
             []
+        , Html.text <| "triangles count: " ++ String.fromInt trianglesCount
         ]
     }
 

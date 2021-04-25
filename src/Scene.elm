@@ -278,11 +278,13 @@ view model =
     in
     { title = "OrbitingCamera"
     , body =
-        [ Scene3d.cloudy
+        [ Scene3d.sunny
             { camera = camera
             , clipDepth = Length.meters 0.1
             , dimensions = ( Pixels.int 400, Pixels.int 300 )
             , background = Scene3d.transparentBackground
+            , shadows = False
+            , sunlightDirection = Direction3d.y
             , entities =
                 [ originCross
 

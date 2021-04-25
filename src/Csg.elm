@@ -223,7 +223,7 @@ type alias SphereSettings =
 
 sphereDefaults : SphereSettings
 sphereDefaults =
-    { slices = 12
+    { slices = 16
     , stacks = 8
     }
 

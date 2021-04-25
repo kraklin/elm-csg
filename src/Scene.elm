@@ -167,6 +167,7 @@ renderCsg trianglesList =
 
 
 cube =
+    --Csg.sphere (Length.meters 0.7)
     Csg.cube (Length.meters 1)
         |> Csg.translate (Vector3d.meters -0.5 -0.5 0.5)
         |> Csg.withColor Color.red
@@ -177,11 +178,11 @@ cube2 =
         |> Csg.withColor Color.red
 
 
-split1 =
-    Csg.subtract sphere cube2
 
-
-
+{-
+   split1 =
+       Csg.subtract sphere cube2
+-}
 -- |> Csg.withColor Color.blue
 
 
@@ -212,31 +213,45 @@ final =
         |> Csg.subtract cylinders
 
 
+
+--Csg.cube (Length.meters 1)
+
+
 finalMesh =
     final
         |> Csg.toMesh
         |> renderCsg
 
 
+
+{-
+   |> Csg.toLines
+   |> Mesh.lineSegments
+   |> Scene3d.mesh (Material.color Color.green)
+-}
+
+
 trianglesCount =
     final |> Csg.toMesh |> List.length
-
-
-
---|> Csg.subtract cylinder
-
-
-union =
-    Csg.intersect cube cube2
-
-
-pyramid =
-    Csg.pyramid
 
 
 sphere =
     Csg.sphere (Length.centimeters 70)
         |> Csg.withColor Color.blue
+
+
+
+--|> Csg.subtract cylinder
+{-
+   union =
+       Csg.intersect cube cube2
+
+
+   pyramid =
+       Csg.pyramid
+
+
+-}
 
 
 view : Model -> Browser.Document Msg
@@ -263,19 +278,17 @@ view model =
     in
     { title = "OrbitingCamera"
     , body =
-        [ Scene3d.sunny
+        [ Scene3d.cloudy
             { camera = camera
             , clipDepth = Length.meters 0.1
             , dimensions = ( Pixels.int 400, Pixels.int 300 )
             , background = Scene3d.transparentBackground
-            , shadows = False
-            , sunlightDirection = Direction3d.y
             , entities =
                 [ originCross
 
                 --, renderCsg <| Csg.toMesh pyramid
                 {--
-                , cube1
+                , cube
                     |> Csg.toLines
                     |> Mesh.lineSegments
                     |> Scene3d.mesh (Material.color Color.purple)
@@ -307,15 +320,18 @@ view model =
                 ]
             , upDirection = Direction3d.positiveZ
             }
-        , Html.input
-            [ Attrs.value (model.clipPlanePosition |> String.fromFloat)
-            , Attrs.min "-1.1"
-            , Attrs.max "1.1"
-            , Attrs.type_ "number"
-            , Attrs.step "0.1"
-            , Events.onInput PlanePositionChanged
-            ]
-            []
+
+        {-
+           , Html.input
+               [ Attrs.value (model.clipPlanePosition |> String.fromFloat)
+               , Attrs.min "-1.1"
+               , Attrs.max "1.1"
+               , Attrs.type_ "number"
+               , Attrs.step "0.1"
+               , Events.onInput PlanePositionChanged
+               ]
+               []
+        -}
         , Html.text <| "triangles count: " ++ String.fromInt trianglesCount
         ]
     }

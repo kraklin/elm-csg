@@ -7,6 +7,7 @@ import Color exposing (Color)
 import Direction3d
 import Length exposing (Length, Meters)
 import LineSegment3d exposing (LineSegment3d)
+import List.NonEmpty as NonEmpty
 import Point3d exposing (Point3d)
 import Quantity exposing (Unitless)
 import Triangle3d exposing (Triangle3d)
@@ -26,32 +27,28 @@ defaultColor =
     Color.yellow
 
 
-toFace : List (Triangle3d Meters c) -> Maybe (Face c)
-toFace triangles =
+toFace : List (Point3d Meters c) -> Maybe (Face c)
+toFace points =
     let
         maybeNormal tri =
             tri
                 |> Triangle3d.normalDirection
-                |> Maybe.map (\dir -> Direction3d.toVector dir)
     in
-    case triangles of
+    case points of
         [] ->
             Nothing
 
-        [ triangle ] ->
-            maybeNormal triangle
-                |> Maybe.map
-                    (\normal ->
-                        Face ( triangle, [] )
-                            normal
-                            defaultColor
-                    )
+        [ v1 ] ->
+            Nothing
 
-        first :: rest ->
-            maybeNormal first
+        [ v1, v2 ] ->
+            Nothing
+
+        v1 :: v2 :: v3 :: rest ->
+            maybeNormal (Triangle3d.from v1 v2 v3)
                 |> Maybe.map
                     (\normal ->
-                        Face ( first, rest )
+                        Face (NonEmpty.fromCons v1 (v2 :: v3 :: rest))
                             normal
                             defaultColor
                     )
@@ -65,26 +62,28 @@ simpleFace : Float -> Csg c
 simpleFace t =
     let
         a =
-            Point3d.meters 0 0 0
+            Point3d.meters -1 0.5 1
 
         b =
-            Point3d.meters 0 0 -1
+            Point3d.meters t 0.5 1
 
         c =
-            Point3d.meters t 0 -1
+            Point3d.meters t 0.5 -2
 
         d =
-            Point3d.meters t 0 0
+            Point3d.meters -1 0.5 -2
 
         frontNormal =
-            Vector3d.unitless 0 1 0
+            Direction3d.y
     in
-    Face ( Triangle3d.from a b c, [ Triangle3d.from a c d ] ) frontNormal defaultColor
+    Face ( a, [ b, c, d ] ) frontNormal defaultColor
         |> List.singleton
         |> BspTree.build
         |> Csg
 
 
+
+{--
 pyramid : Csg c
 pyramid =
     let
@@ -104,37 +103,39 @@ pyramid =
             Point3d.meters 1 0 -1
 
         bottomNormal =
-            Vector3d.unitless 0 -1 0
+            Direction3d.negativeY
 
         frontNormal =
-            Vector3d.unitless 0 1 1
+            Direction3d.negativeY
+            Direction3d.from Point3d.origin <| Point3d.meters 0 1 1
 
         backNormal =
-            Vector3d.unitless 0 1 -1
+            Direction3d.from Point3d.origin <| Point3d.meters 0 1 -1
 
         leftNormal =
-            Vector3d.unitless -1 1 0
+            Direction3d.from Point3d.origin <| Point3d.meters -1 1 0
 
         rightNormal =
-            Vector3d.unitless 1 1 0
+            Direction3d.from Point3d.origin <| Point3d.meters 1 1 0
 
         front =
-            Face ( Triangle3d.from v a b, [] ) frontNormal defaultColor
+            Face ( v, [ a, b ] ) frontNormal defaultColor
 
         back =
-            Face ( Triangle3d.from v d c, [] ) backNormal defaultColor
+            Face ( v, [ d, c ] ) backNormal defaultColor
 
         left =
-            Face ( Triangle3d.from v c a, [] ) leftNormal defaultColor
+            Face ( v, [ c, a ] ) leftNormal defaultColor
 
         right =
-            Face ( Triangle3d.from v b d, [] ) rightNormal defaultColor
+            Face ( v, [ b, d ] ) rightNormal defaultColor
 
         bottom =
             Face ( Triangle3d.from a c d, [ Triangle3d.from d b a ] ) bottomNormal defaultColor
     in
     BspTree.build [ front, back, bottom, left, right ]
         |> Csg
+--}
 
 
 cube : Length -> Csg coordinates
@@ -173,43 +174,43 @@ cuboid { width, height, depth } =
             Point3d.xyz width z (Quantity.negate depth)
 
         frontNormal =
-            Vector3d.unitless 0 0 1
+            Direction3d.z
 
         backNormal =
-            Vector3d.unitless 0 0 -1
+            Direction3d.negativeZ
 
         topNormal =
-            Vector3d.unitless 0 1 0
+            Direction3d.y
 
         bottomNormal =
-            Vector3d.unitless 0 -1 0
+            Direction3d.negativeY
 
         leftNormal =
-            Vector3d.unitless -1 0 0
+            Direction3d.negativeX
 
         rightNormal =
-            Vector3d.unitless 1 0 0
+            Direction3d.x
 
         triangle =
             Triangle3d.from
 
         front =
-            Face ( triangle a c b, [ triangle a d c ] ) frontNormal defaultColor
+            Face ( a, [ d, c, b ] ) frontNormal defaultColor
 
         back =
-            Face ( triangle e f g, [ triangle e g h ] ) backNormal defaultColor
+            Face ( e, [ f, g, h ] ) backNormal defaultColor
 
         top =
-            Face ( triangle b g f, [ triangle b c g ] ) topNormal defaultColor
+            Face ( b, [ c, g, f ] ) topNormal defaultColor
 
         bottom =
-            Face ( triangle a e h, [ triangle a h d ] ) bottomNormal defaultColor
+            Face ( a, [ e, h, d ] ) bottomNormal defaultColor
 
         left =
-            Face ( triangle e a b, [ triangle e b f ] ) leftNormal defaultColor
+            Face ( a, [ b, f, e ] ) leftNormal defaultColor
 
         right =
-            Face ( triangle d h g, [ triangle d g c ] ) rightNormal defaultColor
+            Face ( c, [ d, h, g ] ) rightNormal defaultColor
     in
     BspTree.build [ front, back, top, bottom, left, right ]
         |> Csg
@@ -223,7 +224,7 @@ type alias SphereSettings =
 
 sphereDefaults : SphereSettings
 sphereDefaults =
-    { slices = 12
+    { slices = 16
     , stacks = 8
     }
 
@@ -264,28 +265,23 @@ sphereWith { slices, stacks } radius =
                 |> Point3d.rotateAround Axis3d.x (Quantity.multiplyBy (toFloat it) deltaTheta)
                 |> Point3d.rotateAround Axis3d.y (Quantity.multiplyBy (toFloat ip) deltaPhi)
 
-        triangles =
+        middle : List (Face c)
+        middle =
             List.range 1 (stacks_ - 2)
                 |> List.map
                     (\latId ->
                         List.range 0 (slices_ - 1)
-                            |> List.map
+                            |> List.filterMap
                                 (\long ->
-                                    { i1 = vertex ( latId, long )
-                                    , i2 = vertex ( latId + 1, long )
-                                    , i3 = vertex ( latId, long + 1 )
-                                    , i4 = vertex ( latId + 1, long + 1 )
-                                    }
+                                    toFace
+                                        [ vertex ( latId, long )
+                                        , vertex ( latId + 1, long )
+                                        , vertex ( latId + 1, long + 1 )
+                                        , vertex ( latId, long + 1 )
+                                        ]
                                 )
                     )
                 |> List.concat
-                |> List.map
-                    (\idx ->
-                        [ Triangle3d.from idx.i1 idx.i2 idx.i3
-                        , Triangle3d.from idx.i2 idx.i4 idx.i3
-                        ]
-                    )
-                |> List.filterMap toFace
 
         northCap =
             List.range 0 (slices_ - 1)
@@ -301,9 +297,7 @@ sphereWith { slices, stacks } radius =
                             i3 =
                                 vertex ( 1, long + 1 )
                         in
-                        Triangle3d.from i1 i2 i3
-                            |> List.singleton
-                            |> toFace
+                        toFace [ i1, i2, i3 ]
                     )
 
         southCap =
@@ -320,12 +314,10 @@ sphereWith { slices, stacks } radius =
                             i3 =
                                 vertex ( stacks_ - 1, long + 1 )
                         in
-                        Triangle3d.from i1 i2 i3
-                            |> List.singleton
-                            |> toFace
+                        toFace [ i1, i2, i3 ]
                     )
     in
-    (northCap ++ triangles ++ southCap)
+    (northCap ++ middle ++ southCap)
         |> BspTree.build
         |> Csg
 
@@ -334,7 +326,7 @@ cylinder : Length -> Point3d Meters c -> Point3d Meters c -> Csg c
 cylinder radius start end =
     let
         slices =
-            12
+            16
 
         vector =
             Vector3d.from start end
@@ -379,26 +371,20 @@ cylinder radius start end =
             bottomPoints
                 |> List.filterMap
                     (\( p1, p2 ) ->
-                        Triangle3d.from p1 start p2
-                            |> List.singleton
-                            |> toFace
+                        toFace [ p1, start, p2 ]
                     )
 
         top =
             topPoints
                 |> List.filterMap
                     (\( p1, p2 ) ->
-                        Triangle3d.from p1 p2 end
-                            |> List.singleton
-                            |> toFace
+                        toFace [ p1, p2, end ]
                     )
 
         sides =
             List.map2
                 (\( b1, b2 ) ( t1, t2 ) ->
-                    [ Triangle3d.from b1 b2 t2
-                    , Triangle3d.from t1 b1 t2
-                    ]
+                    [ b1, b2, t2, t1 ]
                 )
                 bottomPoints
                 topPoints
@@ -530,31 +516,39 @@ type alias Triangle c =
 
 
 type alias Vertex c =
-    { position :
-        Point3d Length.Meters c
+    { position : Point3d Length.Meters c
     , normal : Vector3d Unitless c
     , color : Color
     }
 
 
 facesToTriangles : Face coordinates -> List (Triangle coordinates)
-facesToTriangles { triangles, normal, color } =
+facesToTriangles ({ normalDirection, color } as face) =
     let
-        ( first, rest ) =
-            triangles
-
         withNormal ( v1, v2, v3 ) =
-            ( { position = v1, normal = normal, color = color }
-            , { position = v2, normal = normal, color = color }
-            , { position = v3, normal = normal, color = color }
+            ( { position = v1, normal = Direction3d.toVector normalDirection, color = color }
+            , { position = v2, normal = Direction3d.toVector normalDirection, color = color }
+            , { position = v3, normal = Direction3d.toVector normalDirection, color = color }
             )
     in
-    first :: rest |> List.map (\triangle -> Triangle3d.vertices triangle |> withNormal)
+    case BspTree.allPoints face of
+        p1 :: p2 :: rest ->
+            rest
+                |> List.foldl
+                    (\pNext { pPrevious, triangles } ->
+                        { pPrevious = pNext, triangles = withNormal ( p1, pPrevious, pNext ) :: triangles }
+                    )
+                    { pPrevious = p2, triangles = [] }
+                |> .triangles
+
+        _ ->
+            []
 
 
 toMesh : Csg coordinates -> List (Triangle coordinates)
 toMesh (Csg tree) =
-    BspTree.toFaces tree
+    tree
+        |> BspTree.toFaces
         |> List.map facesToTriangles
         |> List.concat
 
@@ -571,6 +565,7 @@ toLines (Csg tree) =
             Point3d.translateBy
                 (Vector3d.toUnitless v1.normal
                     |> Vector3d.fromMeters
+                    |> Vector3d.scaleBy 0.2
                 )
                 (centroid ( v1, v2, v3 ))
 

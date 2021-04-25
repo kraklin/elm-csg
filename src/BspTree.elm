@@ -6,6 +6,7 @@ import Dict
 import Direction3d exposing (Direction3d)
 import Length exposing (Meters)
 import List
+import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Plane3d exposing (Plane3d)
 import Point3d exposing (Point3d)
 import Quantity exposing (Quantity, Unitless)
@@ -13,38 +14,30 @@ import Triangle3d exposing (Triangle3d)
 import Vector3d exposing (Vector3d)
 
 
-type alias Face coordinates =
-    { triangles : ( Triangle3d Meters coordinates, List (Triangle3d Meters coordinates) )
-    , normal : Vector3d Unitless coordinates
+type alias Face c =
+    { points : NonEmpty (Point3d Meters c)
+    , normalDirection : Direction3d c
     , color : Color
     }
 
 
-allTriangles : Face c -> List (Triangle3d Meters c)
-allTriangles { triangles } =
-    let
-        ( first, rest ) =
-            triangles
-    in
-    first :: rest
+allPoints : Face c -> List (Point3d Meters c)
+allPoints { points } =
+    NonEmpty.toList points
 
 
-planeFromFace : Face c -> Maybe (Plane3d Meters c)
-planeFromFace { normal, triangles } =
-    let
-        firstPoint =
-            Tuple.first triangles
-                |> Triangle3d.vertices
-                |> (\( v1, _, _ ) -> v1)
+toFacePoints : List (Point3d Meters c) -> Maybe ( Point3d Meters c, List (Point3d Meters c) )
+toFacePoints points =
+    NonEmpty.fromList points
 
-        maybeDirection =
-            Vector3d.direction normal
-    in
-    Maybe.map (Plane3d.through firstPoint) maybeDirection
+
+planeFromFace : Face c -> Plane3d Meters c
+planeFromFace { points, normalDirection } =
+    Plane3d.through (Tuple.first points) normalDirection
 
 
 type alias NodeData c =
-    { faces : Face c
+    { faces : NonEmpty (Face c)
     , outside : BspTree c
     , inside : BspTree c
     , plane : Plane3d Meters c
@@ -75,71 +68,20 @@ toFaces tree =
                     []
 
                 Node { faces, inside, outside } ->
-                    faces :: (traverse inside ++ traverse outside)
+                    NonEmpty.toList faces ++ (traverse inside ++ traverse outside)
     in
     traverse tree
-
-
-fromTriangles : Vector3d Unitless coordinates -> Color -> List (Triangle3d Meters coordinates) -> Maybe (Face coordinates)
-fromTriangles normal color triangles =
-    case triangles of
-        [] ->
-            Nothing
-
-        first :: rest ->
-            Just <| { color = color, triangles = ( first, rest ), normal = normal }
-
-
-mapFaces : (Face c -> Face c) -> BspTree c -> BspTree c
-mapFaces fn tree =
-    let
-        traverse t =
-            case t of
-                Empty ->
-                    Empty
-
-                Node nodeData ->
-                    Node
-                        { nodeData
-                            | faces = fn nodeData.faces
-                            , inside = traverse nodeData.inside
-                            , outside = traverse nodeData.outside
-                        }
-    in
-    traverse tree
-
-
-translate : Vector3d Meters c -> BspTree c -> BspTree c
-translate vector tree =
-    let
-        translateFace f =
-            allTriangles f
-                |> List.map (Triangle3d.translateBy vector)
-                |> fromTriangles f.normal f.color
-                |> Maybe.withDefault f
-    in
-    case tree of
-        Empty ->
-            Empty
-
-        Node nodeData ->
-            Node
-                { nodeData
-                    | faces = translateFace nodeData.faces
-                    , inside = translate vector nodeData.inside
-                    , outside = translate vector nodeData.outside
-                    , plane = Plane3d.translateBy vector nodeData.plane
-                }
 
 
 insert : Face c -> BspTree c -> BspTree c
 insert face tree =
     let
-        maybePlane =
+        facePlane =
             planeFromFace face
 
+        newNode : Plane3d Meters c -> Face c -> NodeData c
         newNode plane newFace =
-            { faces = newFace, outside = Empty, inside = Empty, plane = plane }
+            { faces = ( newFace, [] ), outside = Empty, inside = Empty, plane = plane }
 
         handleOutside : Plane3d Meters c -> Maybe (Face c) -> NodeData c -> NodeData c
         handleOutside plane maybeFace node =
@@ -167,95 +109,99 @@ insert face tree =
                     )
                 |> Maybe.withDefault node
     in
-    maybePlane
-        |> Maybe.map
-            (\plane ->
-                case tree of
-                    Empty ->
-                        Node <| newNode plane face
+    case tree of
+        Empty ->
+            Node <| newNode facePlane face
 
-                    Node rootData ->
-                        divide rootData.plane face
-                            |> (\{ inside, outside } ->
-                                    rootData
-                                        |> handleOutside plane outside
-                                        |> handleInside plane inside
-                                        |> Node
-                               )
-            )
-        |> Maybe.withDefault Empty
+        Node rootData ->
+            divide rootData.plane face
+                |> (\{ inside, outside } ->
+                        rootData
+                            |> handleOutside facePlane outside
+                            |> handleInside facePlane inside
+                            |> Node
+                   )
+
+
+mapFaces : (Face c -> Face c) -> BspTree c -> BspTree c
+mapFaces fn tree =
+    let
+        traverse t =
+            case t of
+                Empty ->
+                    Empty
+
+                Node nodeData ->
+                    Node
+                        { nodeData
+                            | faces = NonEmpty.map fn nodeData.faces
+                            , inside = traverse nodeData.inside
+                            , outside = traverse nodeData.outside
+                        }
+    in
+    traverse tree
 
 
 divide : Plane3d Meters c -> Face c -> { inside : Maybe (Face c), outside : Maybe (Face c) }
 divide splittingPlane face =
-    let
-        createFace triangles =
-            let
-                getNormals triangle =
-                    Triangle3d.normalDirection triangle
-                        |> Maybe.map (\normal -> ( triangle, Direction3d.toVector normal ))
-
-                trianglesWithNormal =
-                    triangles |> List.map getNormals
-            in
-            case trianglesWithNormal of
-                [] ->
-                    Nothing
-
-                [ maybeOne ] ->
-                    maybeOne
-                        |> Maybe.map
-                            (\one ->
-                                { color = face.color, triangles = ( Tuple.first one, [] ), normal = Tuple.second one }
-                            )
-
-                maybeFirst :: rest ->
-                    maybeFirst
-                        |> Maybe.map
-                            (\first ->
-                                { color = face.color
-                                , triangles =
-                                    ( Tuple.first first
-                                    , List.filterMap (Maybe.map Tuple.first) rest
-                                    )
-                                , normal = Tuple.second first
-                                }
-                            )
-    in
-    allTriangles face
-        |> List.map (splitByPlane splittingPlane)
-        |> List.foldl
-            (\{ front, back } acc ->
-                { inside = back ++ acc.inside
-                , outside = front ++ acc.outside
+    splitByPlane splittingPlane face
+        |> (\{ front, back } ->
+                { inside = back
+                , outside = front
                 }
-            )
-            { inside = [], outside = [] }
-        |> (\{ inside, outside } ->
-                { inside = createFace inside, outside = createFace outside }
            )
+
+
+fromPoints : Direction3d coordinates -> Color -> List (Point3d Meters coordinates) -> Maybe (Face coordinates)
+fromPoints normalDirection color triangles =
+    case triangles of
+        [] ->
+            Nothing
+
+        first :: rest ->
+            Just { color = color, points = ( first, rest ), normalDirection = normalDirection }
+
+
+translate : Vector3d Meters c -> BspTree c -> BspTree c
+translate vector tree =
+    let
+        translateFace f =
+            allPoints f
+                |> List.map (Point3d.translateBy vector)
+                |> fromPoints f.normalDirection f.color
+                |> Maybe.withDefault f
+    in
+    case tree of
+        Empty ->
+            Empty
+
+        Node nodeData ->
+            Node
+                { nodeData
+                    | faces = NonEmpty.map translateFace nodeData.faces
+                    , inside = translate vector nodeData.inside
+                    , outside = translate vector nodeData.outside
+                    , plane = Plane3d.translateBy vector nodeData.plane
+                }
 
 
 clip : BspTree c -> BspTree c -> BspTree c
 clip t1 t2 =
     t2
         |> toFaces
-        |> List.filterMap (\f -> clipFace f t1)
+        |> List.map (\f -> clipFace f t1)
+        |> List.concat
         |> build
 
 
 invert : BspTree c -> BspTree c
 invert tree =
     let
-        invertTriangle triangle =
-            Triangle3d.vertices triangle
-                |> (\( v1, v2, v3 ) -> Triangle3d.from v3 v2 v1)
-
         invertFace : Face c -> Face c
         invertFace f =
             { f
-                | normal = Vector3d.minus f.normal Vector3d.zero
-                , triangles = Tuple.mapBoth invertTriangle (List.map invertTriangle) f.triangles
+                | points = NonEmpty.reverse f.points
+                , normalDirection = Direction3d.reverse f.normalDirection
             }
     in
     case tree of
@@ -265,82 +211,59 @@ invert tree =
         Node nodeData ->
             Node
                 { nodeData
-                    | faces = invertFace nodeData.faces
+                    | faces = NonEmpty.map invertFace nodeData.faces
                     , inside = invert nodeData.inside
                     , outside = invert nodeData.outside
                     , plane = Plane3d.flip nodeData.plane
                 }
 
 
-clipFace : Face c -> BspTree c -> Maybe (Face c)
+clipFace : Face c -> BspTree c -> List (Face c)
 clipFace clippedFace clippingTree =
     let
         arePlanesSame treePlane face =
-            case planeFromFace face of
-                Nothing ->
-                    False
+            treePlane == planeFromFace face
 
-                Just plane ->
-                    treePlane == plane
-
-        combineFace ( maybeA, maybeB ) =
-            case ( maybeA, maybeB ) of
-                ( Nothing, Nothing ) ->
-                    Nothing
-
-                ( Just a, Nothing ) ->
-                    Just a
-
-                ( Nothing, Just b ) ->
-                    Just b
-
-                ( Just a, Just b ) ->
-                    case allTriangles a ++ allTriangles b of
-                        [] ->
-                            Nothing
-
-                        first :: rest ->
-                            Just { color = b.color, triangles = ( first, rest ), normal = b.normal }
-
-        handleInside : Maybe (Face c) -> BspTree c -> Maybe (Face c)
+        handleInside : Maybe (Face c) -> BspTree c -> List (Face c)
         handleInside maybeFace tree =
             maybeFace
-                |> Maybe.andThen
+                |> Maybe.map
                     (\face ->
                         case tree of
                             Empty ->
-                                Just face
+                                [ face ]
 
                             Node _ ->
                                 clipFace face tree
                     )
+                |> Maybe.withDefault []
 
-        handleOutside : Maybe (Face c) -> BspTree c -> Maybe (Face c)
+        handleOutside : Maybe (Face c) -> BspTree c -> List (Face c)
         handleOutside maybeFace tree =
             maybeFace
-                |> Maybe.andThen
+                |> Maybe.map
                     (\face ->
                         case tree of
                             Empty ->
-                                Nothing
+                                []
 
                             Node _ ->
                                 clipFace face tree
                     )
+                |> Maybe.withDefault []
     in
     case clippingTree of
         Empty ->
-            Nothing
+            []
 
         Node rootData ->
             if arePlanesSame rootData.plane clippedFace then
-                Nothing
+                []
 
             else
                 divide rootData.plane clippedFace
                     |> (\{ inside, outside } ->
-                            ( handleInside inside rootData.inside, handleOutside outside rootData.outside )
-                                |> combineFace
+                            handleInside inside rootData.inside ++ handleOutside outside rootData.outside
                        )
 
 
@@ -353,8 +276,8 @@ dedup list =
 
 
 type alias IntersectionResult c =
-    { front : List (Triangle3d Meters c)
-    , back : List (Triangle3d Meters c)
+    { front : Maybe (Face c)
+    , back : Maybe (Face c)
     }
 
 
@@ -371,10 +294,8 @@ type alias ClassifiedVertex c =
     }
 
 
-type alias ClassifiedTriangle c =
-    { v1 : ClassifiedVertex c
-    , v2 : ClassifiedVertex c
-    , v3 : ClassifiedVertex c
+type alias ClassifiedFace c =
+    { points : List (ClassifiedVertex c)
     , class : Classification
     }
 
@@ -411,30 +332,21 @@ numberToClass class =
             Spanning
 
 
+epsilon =
+    1.0e-5
+
+
 combineClasses : Classification -> Classification -> Classification
 combineClasses c1 c2 =
     Bitwise.or (classToNumber c1) (classToNumber c2)
         |> numberToClass
 
 
-epsilon =
-    1.0e-5
-
-
-classifyTriangle : Plane3d Meters c -> Triangle3d Meters c -> ClassifiedTriangle c
-classifyTriangle plane triangle =
+classifyFace : Plane3d Meters c -> Face c -> ClassifiedFace c
+classifyFace plane face =
     let
-        ( v1, v2, v3 ) =
-            Triangle3d.vertices triangle
-
         planeNormal =
             Plane3d.normalDirection plane |> Direction3d.toVector
-
-        ( vec1, vec2, vec3 ) =
-            ( Vector3d.from Point3d.origin v1
-            , Vector3d.from Point3d.origin v2
-            , Vector3d.from Point3d.origin v3
-            )
 
         w =
             Vector3d.dot planeNormal (Vector3d.from Point3d.origin (Plane3d.originPoint plane))
@@ -453,64 +365,48 @@ classifyTriangle plane triangle =
                             Coplanar
                    )
 
-        ( c1, c2, c3 ) =
-            ( t vec1
-            , t vec2
-            , t vec3
-            )
+        classifiedPoints =
+            allPoints face
+                |> List.map (\point -> { class = Vector3d.from Point3d.origin point |> t, point = point })
 
         combinedClasses =
-            combineClasses c1 c2
-                |> combineClasses c3
+            classifiedPoints
+                |> List.foldl (.class >> combineClasses) Coplanar
     in
     { class = combinedClasses
-    , v1 = { point = v1, class = c1 }
-    , v2 = { point = v2, class = c2 }
-    , v3 = { point = v3, class = c3 }
+    , points = classifiedPoints
     }
 
 
-splitByPlane : Plane3d Meters c -> Triangle3d Meters c -> IntersectionResult c
-splitByPlane plane triangle =
+splitByPlane : Plane3d Meters c -> Face c -> IntersectionResult c
+splitByPlane plane face =
     let
-        classifiedTriangle =
-            classifyTriangle plane triangle
+        classifiedFace =
+            classifyFace plane face
 
-        ( v1, v2, v3 ) =
-            ( classifiedTriangle.v1
-            , classifiedTriangle.v2
-            , classifiedTriangle.v3
-            )
-
-        maybeIsFront tri =
-            Triangle3d.normalDirection tri
-                |> Maybe.map
-                    (Direction3d.toVector
-                        >> Vector3d.dot
-                            (Plane3d.normalDirection plane
-                                |> Direction3d.toVector
-                            )
-                        >> Quantity.greaterThan Quantity.zero
+        isFront : Face c -> Bool
+        isFront face_ =
+            face_.normalDirection
+                |> Direction3d.toVector
+                |> Vector3d.dot
+                    (Plane3d.normalDirection plane
+                        |> Direction3d.toVector
                     )
+                |> Quantity.greaterThan Quantity.zero
     in
-    case classifiedTriangle.class of
+    case classifiedFace.class of
         Coplanar ->
-            case maybeIsFront triangle of
-                Nothing ->
-                    { front = [], back = [] }
+            if isFront face then
+                { front = Just face, back = Nothing }
 
-                Just isFront ->
-                    if isFront then
-                        { front = [ triangle ], back = [] }
-
-                    else
-                        { front = [], back = [ triangle ] }
+            else
+                { front = Nothing, back = Just face }
 
         Front ->
-            { front = [ triangle ], back = [] }
+            { front = Just face, back = Nothing }
 
         Back ->
-            { front = [], back = [ triangle ] }
+            { front = Nothing, back = Just face }
 
         Spanning ->
             let
@@ -554,18 +450,26 @@ splitByPlane plane triangle =
                     else
                         Nothing
 
-                toTriangles points =
-                    case points of
-                        [ p1, p2, p3 ] ->
-                            [ Triangle3d.from p1 p2 p3 ]
-
-                        [ p1, p2, p3, p4 ] ->
-                            [ Triangle3d.from p1 p2 p3, Triangle3d.from p3 p4 p1 ]
+                pairs =
+                    case classifiedFace.points of
+                        first :: _ :: _ ->
+                            classifiedFace.points
+                                |> List.reverse
+                                |> List.foldl (\point { prev, pairs_ } -> { prev = point, pairs_ = ( point, prev ) :: pairs_ })
+                                    { prev = first, pairs_ = [] }
+                                |> .pairs_
 
                         _ ->
                             []
+
+                toFace points =
+                    toFacePoints points
+                        |> Maybe.map
+                            (\points_ ->
+                                { face | points = points_ }
+                            )
             in
-            [ ( v1, v2 ), ( v2, v3 ), ( v3, v1 ) ]
+            pairs
                 |> List.map
                     (\tuple ->
                         { front = [ maybeFrontPoint tuple, maybeSplitPoint tuple ] |> List.filterMap identity
@@ -580,4 +484,4 @@ splitByPlane plane triangle =
                         }
                     )
                     { front = [], back = [] }
-                |> (\{ front, back } -> { front = toTriangles front, back = toTriangles back })
+                |> (\{ front, back } -> { front = toFace front, back = toFace back })

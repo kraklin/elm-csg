@@ -1,7 +1,7 @@
 module Csg exposing (..)
 
-import Angle
-import Axis3d
+import Angle exposing (Angle)
+import Axis3d exposing (Axis3d)
 import BspTree exposing (BspTree, Face)
 import Color exposing (Color)
 import Direction3d
@@ -10,7 +10,7 @@ import LineSegment3d exposing (LineSegment3d)
 import List.NonEmpty as NonEmpty
 import Point3d exposing (Point3d)
 import Quantity exposing (Unitless)
-import Triangle3d exposing (Triangle3d)
+import Triangle3d
 import Vector3d exposing (Vector3d)
 
 
@@ -35,15 +35,6 @@ toFace points =
                 |> Triangle3d.normalDirection
     in
     case points of
-        [] ->
-            Nothing
-
-        [ v1 ] ->
-            Nothing
-
-        [ v1, v2 ] ->
-            Nothing
-
         v1 :: v2 :: v3 :: rest ->
             maybeNormal (Triangle3d.from v1 v2 v3)
                 |> Maybe.map
@@ -53,89 +44,12 @@ toFace points =
                             defaultColor
                     )
 
+        _ ->
+            Nothing
+
 
 
 -- Solids construction
-
-
-simpleFace : Float -> Csg c
-simpleFace t =
-    let
-        a =
-            Point3d.meters -1 0.5 1
-
-        b =
-            Point3d.meters t 0.5 1
-
-        c =
-            Point3d.meters t 0.5 -2
-
-        d =
-            Point3d.meters -1 0.5 -2
-
-        frontNormal =
-            Direction3d.y
-    in
-    Face ( a, [ b, c, d ] ) frontNormal defaultColor
-        |> List.singleton
-        |> BspTree.build
-        |> Csg
-
-
-
-{--
-pyramid : Csg c
-pyramid =
-    let
-        v =
-            Point3d.meters 0 1 0
-
-        a =
-            Point3d.meters -1 0 1
-
-        b =
-            Point3d.meters 1 0 1
-
-        c =
-            Point3d.meters -1 0 -1
-
-        d =
-            Point3d.meters 1 0 -1
-
-        bottomNormal =
-            Direction3d.negativeY
-
-        frontNormal =
-            Direction3d.negativeY
-            Direction3d.from Point3d.origin <| Point3d.meters 0 1 1
-
-        backNormal =
-            Direction3d.from Point3d.origin <| Point3d.meters 0 1 -1
-
-        leftNormal =
-            Direction3d.from Point3d.origin <| Point3d.meters -1 1 0
-
-        rightNormal =
-            Direction3d.from Point3d.origin <| Point3d.meters 1 1 0
-
-        front =
-            Face ( v, [ a, b ] ) frontNormal defaultColor
-
-        back =
-            Face ( v, [ d, c ] ) backNormal defaultColor
-
-        left =
-            Face ( v, [ c, a ] ) leftNormal defaultColor
-
-        right =
-            Face ( v, [ b, d ] ) rightNormal defaultColor
-
-        bottom =
-            Face ( Triangle3d.from a c d, [ Triangle3d.from d b a ] ) bottomNormal defaultColor
-    in
-    BspTree.build [ front, back, bottom, left, right ]
-        |> Csg
---}
 
 
 cube : Length -> Csg coordinates
@@ -190,9 +104,6 @@ cuboid { width, height, depth } =
 
         rightNormal =
             Direction3d.x
-
-        triangle =
-            Triangle3d.from
 
         front =
             Face ( a, [ d, c, b ] ) frontNormal defaultColor
@@ -352,8 +263,8 @@ cylinder radius start end =
                         maybeRotationAxis
                             |> Maybe.map
                                 (\axis ->
-                                    ( Point3d.rotateAround axis (Quantity.multiplyBy (toFloat idx) deltaPhi) initialPoint
-                                    , Point3d.rotateAround axis (Quantity.multiplyBy (toFloat (idx + 1)) deltaPhi) initialPoint
+                                    ( Point3d.rotateAround axis (deltaPhi |> Quantity.multiplyBy (toFloat idx)) initialPoint
+                                    , Point3d.rotateAround axis (deltaPhi |> Quantity.multiplyBy (toFloat (idx + 1))) initialPoint
                                     )
                                 )
                     )
@@ -418,48 +329,37 @@ subtract (Csg t1) (Csg t2) =
 
 
 intersect : Csg c -> Csg c -> Csg c
-intersect (Csg a) (Csg b) =
-    {-
-       intersect: function(csg) {
-          var a = new CSG.Node(this.clone().polygons);
-          var b = new CSG.Node(csg.clone().polygons);
-          a.invert();
-          b.clipTo(a);
-          b.invert();
-          a.clipTo(b);
-          b.clipTo(a);
-          a.build(b.allPolygons());
-          a.invert();
-          return CSG.fromPolygons(a.allPolygons());
-        },
-
-    -}
+intersect (Csg t1) (Csg t2) =
     let
-        t1 =
-            a
+        a =
+            t1
                 |> BspTree.invert
-                |> BspTree.clip b
+                |> BspTree.clip t2
                 |> BspTree.invert
                 |> BspTree.toFaces
 
-        t2 =
-            b
+        b =
+            t2
                 |> BspTree.invert
-                |> BspTree.clip a
+                |> BspTree.clip t1
                 |> BspTree.invert
                 |> BspTree.toFaces
     in
-    BspTree.build (t1 ++ t2)
+    BspTree.build (a ++ b)
         |> Csg
 
 
 union : Csg c -> Csg c -> Csg c
 union (Csg t1) (Csg t2) =
     let
-        a_ =
+        a =
             t1
-                |> BspTree.invert
-                |> BspTree.clip t2
+                |> BspTree.clip
+                    (t2
+                        |> BspTree.invert
+                        |> BspTree.clip t1
+                    )
+                |> BspTree.toFaces
 
         b =
             t2
@@ -469,17 +369,13 @@ union (Csg t1) (Csg t2) =
                         |> BspTree.clip t2
                     )
                 |> BspTree.toFaces
-
-        a =
-            t1
-                |> BspTree.clip
-                    (t2
-                        |> BspTree.invert
-                        |> BspTree.clip t1
-                    )
-                |> BspTree.toFaces
     in
-    (a ++ b)
+    (if List.isEmpty (a ++ b) then
+        BspTree.toFaces t1 ++ BspTree.toFaces t2
+
+     else
+        a ++ b
+    )
         |> BspTree.build
         |> Csg
 
@@ -498,9 +394,17 @@ translate vector (Csg tree) =
         |> Csg
 
 
+rotateAround : Axis3d Meters c -> Angle -> Csg c -> Csg c
+rotateAround axis angle (Csg tree) =
+    tree
+        |> BspTree.rotateAround axis angle
+        |> Csg
+
+
 withColor : Color -> Csg c -> Csg c
 withColor color (Csg tree) =
-    BspTree.mapFaces (\f -> { f | color = color }) tree
+    tree
+        |> BspTree.mapFaces (\f -> { f | color = color })
         |> Csg
 
 

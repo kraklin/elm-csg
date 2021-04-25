@@ -1,5 +1,7 @@
 module BspTree exposing (..)
 
+import Angle exposing (Angle)
+import Axis3d exposing (Axis3d)
 import Bitwise
 import Color exposing (Color)
 import Dict
@@ -9,8 +11,7 @@ import List
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Plane3d exposing (Plane3d)
 import Point3d exposing (Point3d)
-import Quantity exposing (Quantity, Unitless)
-import Triangle3d exposing (Triangle3d)
+import Quantity
 import Vector3d exposing (Vector3d)
 
 
@@ -123,25 +124,6 @@ insert face tree =
                    )
 
 
-mapFaces : (Face c -> Face c) -> BspTree c -> BspTree c
-mapFaces fn tree =
-    let
-        traverse t =
-            case t of
-                Empty ->
-                    Empty
-
-                Node nodeData ->
-                    Node
-                        { nodeData
-                            | faces = NonEmpty.map fn nodeData.faces
-                            , inside = traverse nodeData.inside
-                            , outside = traverse nodeData.outside
-                        }
-    in
-    traverse tree
-
-
 divide : Plane3d Meters c -> Face c -> { inside : Maybe (Face c), outside : Maybe (Face c) }
 divide splittingPlane face =
     splitByPlane splittingPlane face
@@ -160,6 +142,25 @@ fromPoints normalDirection color triangles =
 
         first :: rest ->
             Just { color = color, points = ( first, rest ), normalDirection = normalDirection }
+
+
+mapFaces : (Face c -> Face c) -> BspTree c -> BspTree c
+mapFaces fn tree =
+    let
+        traverse t =
+            case t of
+                Empty ->
+                    Empty
+
+                Node nodeData ->
+                    Node
+                        { nodeData
+                            | faces = NonEmpty.map fn nodeData.faces
+                            , inside = traverse nodeData.inside
+                            , outside = traverse nodeData.outside
+                        }
+    in
+    traverse tree
 
 
 translate : Vector3d Meters c -> BspTree c -> BspTree c
@@ -182,6 +183,29 @@ translate vector tree =
                     , inside = translate vector nodeData.inside
                     , outside = translate vector nodeData.outside
                     , plane = Plane3d.translateBy vector nodeData.plane
+                }
+
+
+rotateAround : Axis3d Meters c -> Angle -> BspTree c -> BspTree c
+rotateAround axis angle tree =
+    let
+        rotateFace f =
+            allPoints f
+                |> List.map (Point3d.rotateAround axis angle)
+                |> fromPoints (Direction3d.rotateAround axis angle f.normalDirection) f.color
+                |> Maybe.withDefault f
+    in
+    case tree of
+        Empty ->
+            Empty
+
+        Node nodeData ->
+            Node
+                { nodeData
+                    | faces = NonEmpty.map rotateFace nodeData.faces
+                    , inside = rotateAround axis angle nodeData.inside
+                    , outside = rotateAround axis angle nodeData.outside
+                    , plane = Plane3d.rotateAround axis angle nodeData.plane
                 }
 
 

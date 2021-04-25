@@ -5,6 +5,7 @@ mouse events and moving the camera accordingly.
 -}
 
 import Angle exposing (Angle)
+import Axis3d exposing (Axis3d)
 import Browser
 import Browser.Events
 import BspTree
@@ -207,18 +208,102 @@ final =
                 |> Csg.union cylinderY
                 |> Csg.union cylinderZ
                 |> Csg.withColor Color.green
+                |> Csg.rotateAround Axis3d.y (Angle.degrees 45)
     in
     cube
         |> Csg.intersect sphere
         |> Csg.subtract cylinders
+        |> Csg.translate (Vector3d.meters 0 0.5 0)
+        |> Csg.withColor Color.yellow
+
+
+dice =
+    let
+        dotRadius =
+            Length.centimeters 8
+
+        cubeSize =
+            Length.meters 1
+
+        dotAt x y =
+            Csg.sphereWith { slices = 8, stacks = 4 } dotRadius
+                |> Csg.translate
+                    (Vector3d.meters
+                        (0.3 + (x * 0.2))
+                        (0.3 + (y * 0.2))
+                        0
+                    )
+
+        one =
+            dotAt 1 1
+
+        two =
+            dotAt 2 2
+                |> Csg.union (dotAt 0 0)
+
+        three =
+            one
+                |> Csg.union two
+
+        four =
+            two
+                |> Csg.union
+                    (dotAt 0 2
+                        |> Csg.union (dotAt 2 0)
+                    )
+
+        five =
+            four |> Csg.union one
+
+        six =
+            four
+                |> Csg.union
+                    (dotAt 1 2
+                        |> Csg.union (dotAt 1 0)
+                    )
+
+        base =
+            Csg.cube cubeSize
+                |> Csg.translate (Vector3d.meters -0.5 -0.5 0.5)
+                |> Csg.intersect sphere
+                |> Csg.translate (Vector3d.meters 0.5 0.5 -0.5)
+                |> Csg.withColor Color.red
+
+        dots =
+            one
+                |> Csg.union (six |> Csg.translate (Vector3d.meters 0 0 -1))
+                |> Csg.union (two |> Csg.rotateAround Axis3d.x (Angle.degrees -90))
+                |> Csg.union
+                    (five
+                        |> Csg.rotateAround Axis3d.x (Angle.degrees -90)
+                        |> Csg.translate (Vector3d.meters 0 1 0)
+                    )
+                |> Csg.union
+                    (three
+                        |> Csg.rotateAround Axis3d.y (Angle.degrees -90)
+                        |> Csg.rotateAround Axis3d.x (Angle.degrees -90)
+                    )
+                |> Csg.union
+                    (four
+                        |> Csg.rotateAround Axis3d.y (Angle.degrees -90)
+                        |> Csg.rotateAround Axis3d.x (Angle.degrees -90)
+                        |> Csg.translate (Vector3d.meters 1 0 0)
+                    )
+                |> Csg.withColor Color.white
+    in
+    base
+        |> Csg.subtract dots
+        |> Csg.translate (Vector3d.meters -0.5 -0.5 0.5)
 
 
 
+-- |> Csg.translate (Vector3d.meters -0.5 -0.5 0.5)
+-- (Vector3d.meters 0 0.5 0)
 --Csg.cube (Length.meters 1)
 
 
 finalMesh =
-    final
+    dice
         |> Csg.toMesh
         |> renderCsg
 
@@ -232,7 +317,7 @@ finalMesh =
 
 
 trianglesCount =
-    final |> Csg.toMesh |> List.length
+    dice |> Csg.toMesh |> List.length
 
 
 sphere =
@@ -278,13 +363,11 @@ view model =
     in
     { title = "OrbitingCamera"
     , body =
-        [ Scene3d.sunny
+        [ Scene3d.cloudy
             { camera = camera
             , clipDepth = Length.meters 0.1
             , dimensions = ( Pixels.int 400, Pixels.int 300 )
             , background = Scene3d.transparentBackground
-            , shadows = False
-            , sunlightDirection = Direction3d.y
             , entities =
                 [ originCross
 
@@ -314,8 +397,14 @@ view model =
                 , renderCsg <| Csg.toMesh split1
 
                 --}
-                --{--
+                {--
                 , finalMesh
+
+                --}
+                --{--,
+                , dice
+                    |> Csg.toMesh
+                    |> renderCsg
 
                 ---}
                 --, Scene3d.mesh (Material.color Color.blue) clippedCubeBottom --cubesWireframe

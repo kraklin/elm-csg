@@ -310,8 +310,8 @@ cylinder radius start end =
 -- Operations
 
 
-subtract : Csg c -> Csg c -> Csg c
-subtract (Csg t1) (Csg t2) =
+subtractFrom : Csg c -> Csg c -> Csg c
+subtractFrom (Csg t1) (Csg t2) =
     let
         a =
             t1
@@ -328,8 +328,8 @@ subtract (Csg t1) (Csg t2) =
         |> Csg
 
 
-intersect : Csg c -> Csg c -> Csg c
-intersect (Csg t1) (Csg t2) =
+intersectWith : Csg c -> Csg c -> Csg c
+intersectWith (Csg t1) (Csg t2) =
     let
         a =
             t1
@@ -345,7 +345,8 @@ intersect (Csg t1) (Csg t2) =
                 |> BspTree.invert
                 |> BspTree.toFaces
     in
-    BspTree.build (a ++ b)
+    (a ++ b)
+        |> BspTree.build
         |> Csg
 
 
@@ -370,12 +371,7 @@ union (Csg t1) (Csg t2) =
                     )
                 |> BspTree.toFaces
     in
-    (if List.isEmpty (a ++ b) then
-        BspTree.toFaces t1 ++ BspTree.toFaces t2
-
-     else
-        a ++ b
-    )
+    (a ++ b)
         |> BspTree.build
         |> Csg
 
@@ -387,8 +383,16 @@ invert (Csg tree) =
         |> Csg
 
 
-translate : Vector3d Meters c -> Csg c -> Csg c
-translate vector (Csg tree) =
+group : List (Csg c) -> Csg c
+group csgs =
+    csgs
+        |> List.foldl (\(Csg tree) acc -> BspTree.toFaces tree ++ acc) []
+        |> BspTree.build
+        |> Csg
+
+
+translateBy : Vector3d Meters c -> Csg c -> Csg c
+translateBy vector (Csg tree) =
     tree
         |> BspTree.translate vector
         |> Csg

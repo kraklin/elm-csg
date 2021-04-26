@@ -363,53 +363,31 @@ view model =
     in
     { title = "OrbitingCamera"
     , body =
-        [ Scene3d.cloudy
+        [ Html.div
+            [ Attrs.style "position" "absolute"
+            , Attrs.style "top" "200px"
+            ]
+            [ Scene3d.cloudy
+                { camera = camera
+                , clipDepth = Length.meters 0.1
+                , dimensions = ( Pixels.int 100, Pixels.int 100 )
+                , background = Scene3d.transparentBackground
+                , entities =
+                    [ originCross ]
+                , upDirection = Direction3d.positiveY
+                }
+            ]
+        , Scene3d.cloudy
             { camera = camera
             , clipDepth = Length.meters 0.1
             , dimensions = ( Pixels.int 400, Pixels.int 300 )
             , background = Scene3d.transparentBackground
             , entities =
-                [ originCross
-
-                --, renderCsg <| Csg.toMesh pyramid
-                {--
-                , cube
-                    |> Csg.toLines
-                    |> Mesh.lineSegments
-                    |> Scene3d.mesh (Material.color Color.purple)
-
-                --}
-                {--
-                , cube2
-                    |> Csg.toLines
-                    |> Mesh.lineSegments
-                    |> Scene3d.mesh (Material.color Color.red)
-
-                --}
-                --, renderCsg <| Csg.toMesh sphere
-                {--, sphere
-                    |> Csg.toLines
-                    |> Mesh.lineSegments
-                    |> Scene3d.mesh (Material.color Color.red)
-
-                --}
-                {--
-                , renderCsg <| Csg.toMesh split1
-
-                --}
-                {--
-                , finalMesh
-
-                --}
-                --{--,
-                , dice
+                [ dice
                     |> Csg.toMesh
                     |> renderCsg
-
-                ---}
-                --, Scene3d.mesh (Material.color Color.blue) clippedCubeBottom --cubesWireframe
                 ]
-            , upDirection = Direction3d.positiveZ
+            , upDirection = Direction3d.positiveY
             }
 
         {-

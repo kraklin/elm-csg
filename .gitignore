@@ -1,4 +1,10 @@
-node_modules/
-elm-stuff/
-index.html
+node_modules
 
+# elm-package generated files
+elm-stuff
+
+# elm-repl generated files
+repl-temp-*
+
+# elm-live generated index.html
+index.html

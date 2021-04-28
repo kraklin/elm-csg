@@ -311,7 +311,7 @@ cylinder radius start end =
 
 
 subtractFrom : Csg c -> Csg c -> Csg c
-subtractFrom (Csg t1) (Csg t2) =
+subtractFrom (Csg t2) (Csg t1) =
     let
         a =
             t1
@@ -402,6 +402,20 @@ rotateAround : Axis3d Meters c -> Angle -> Csg c -> Csg c
 rotateAround axis angle (Csg tree) =
     tree
         |> BspTree.rotateAround axis angle
+        |> Csg
+
+
+scaleAbout : Point3d Meters c -> Float -> Csg c -> Csg c
+scaleAbout origin factor (Csg tree) =
+    tree
+        |> BspTree.scaleAbout origin factor
+        |> Csg
+
+
+scaleBy : Vector3d Meters c -> Csg c -> Csg c
+scaleBy vector (Csg tree) =
+    tree
+        |> BspTree.scaleBy vector
         |> Csg
 
 

@@ -209,6 +209,93 @@ rotateAround axis angle tree =
                 }
 
 
+scaleAbout : Point3d Meters c -> Float -> BspTree c -> BspTree c
+scaleAbout origin factor tree =
+    let
+        scaleFace f =
+            allPoints f
+                |> List.map (Point3d.scaleAbout origin factor)
+                |> fromPoints f.normalDirection f.color
+                |> Maybe.withDefault f
+
+        scalePlane p =
+            Plane3d.originPoint p
+                |> Point3d.scaleAbout origin factor
+                |> (\newOrigin -> Plane3d.through newOrigin (Plane3d.normalDirection p))
+    in
+    case tree of
+        Empty ->
+            Empty
+
+        Node nodeData ->
+            Node
+                { nodeData
+                    | faces = NonEmpty.map scaleFace nodeData.faces
+                    , inside = scaleAbout origin factor nodeData.inside
+                    , outside = scaleAbout origin factor nodeData.outside
+                    , plane = scalePlane nodeData.plane
+                }
+
+
+scaleBy : Vector3d Meters c -> BspTree c -> BspTree c
+scaleBy vector tree =
+    let
+        ( xScale, yScale, zScale ) =
+            Vector3d.components vector
+
+        scalePoint p =
+            Point3d.toMeters p
+                |> (\{ x, y, z } ->
+                        Point3d.xyz
+                            (Quantity.multiplyBy x xScale)
+                            (Quantity.multiplyBy y yScale)
+                            (Quantity.multiplyBy z zScale)
+                   )
+
+        scaleDirection d =
+            let
+                ( dx, dy, dz ) =
+                    Direction3d.components d
+
+                handleScale dFloat s =
+                    if dFloat < 0 then
+                        -(-dFloat / Length.inMeters s)
+
+                    else
+                        dFloat / Length.inMeters s
+            in
+            Point3d.xyz
+                (Length.meters (handleScale dx xScale))
+                (Length.meters (handleScale dy yScale))
+                (Length.meters (handleScale dz zScale))
+                |> Direction3d.from Point3d.origin
+                |> Maybe.withDefault d
+
+        scaleFace f =
+            allPoints f
+                |> List.map scalePoint
+                |> fromPoints (scaleDirection f.normalDirection) f.color
+                |> Maybe.withDefault f
+
+        scalePlane p =
+            Plane3d.originPoint p
+                |> scalePoint
+                |> (\newOrigin -> Plane3d.through newOrigin (scaleDirection (Plane3d.normalDirection p)))
+    in
+    case tree of
+        Empty ->
+            Empty
+
+        Node nodeData ->
+            Node
+                { nodeData
+                    | faces = NonEmpty.map scaleFace nodeData.faces
+                    , inside = scaleBy vector nodeData.inside
+                    , outside = scaleBy vector nodeData.outside
+                    , plane = scalePlane nodeData.plane
+                }
+
+
 clip : BspTree c -> BspTree c -> BspTree c
 clip t1 t2 =
     t2

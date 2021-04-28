@@ -218,6 +218,41 @@ final =
         |> Csg.withColor Color.yellow
 
 
+finalCsg3 =
+    let
+        cubeBigger =
+            Csg.cube (Length.meters 1)
+
+        cubeScaled =
+            cubeBigger
+                |> Csg.scaleAbout Point3d.origin 0.5
+
+        cubeSmaller =
+            Csg.cube (Length.meters 0.5)
+                |> Csg.translateBy (Vector3d.meters -0.01 -0.01 0.01)
+    in
+    cubeSmaller
+        |> Csg.subtractFrom cubeBigger
+
+
+
+--|> Csg.scaleBy (Vector3d.meters 3 1 0.5)
+
+
+finalCsg4 =
+    Csg.cube (Length.meters 1)
+        |> Csg.scaleBy (Vector3d.meters 0.4 1 1)
+        |> Csg.rotateAround Axis3d.y (Angle.degrees -45)
+        |> Csg.translateBy (Vector3d.meters 0 0 0.7)
+        |> Csg.scaleBy (Vector3d.meters 2 1 1)
+        |> Csg.rotateAround Axis3d.y (Angle.degrees 22.5)
+        |> Csg.subtractFrom
+            (Csg.sphere (Length.meters 1)
+                |> Csg.scaleBy (Vector3d.meters 2 1 1)
+            )
+        |> Csg.scaleBy (Vector3d.meters 0.5 1 1)
+
+
 finalCsg =
     let
         dotRadius =
@@ -295,9 +330,16 @@ finalCsg =
                 ]
                 |> Csg.withColor Color.white
     in
-    base
-        |> Csg.subtractFrom dots
-        |> Csg.translateBy (Vector3d.meters -1 -1 1)
+    {-
+       dots
+           |> Csg.subtractFrom base
+           |> Csg.translateBy (Vector3d.meters -0.5 -0.5 0.5)
+           |> Csg.scaleBy (Vector3d.meters 2 1 1)
+           |> Csg.rotateAround Axis3d.x (Angle.degrees -45)
+    -}
+    sphere
+        |> Csg.scaleBy (Vector3d.meters 1.5 0.5 1)
+        |> Csg.subtractFrom cube
 
 
 
@@ -524,6 +566,19 @@ numberToLineSegments num =
         |> List.concat
 
 
+finalCsgLines =
+    finalCsg
+        |> Csg.toLines
+        |> Mesh.lineSegments
+        |> Scene3d.mesh (Material.color Color.green)
+
+
+finalCsgMesh =
+    finalCsg
+        |> Csg.toMesh
+        |> renderCsg
+
+
 view : Model -> Browser.Document Msg
 view model =
     let
@@ -577,9 +632,7 @@ view model =
                 , background = Scene3d.transparentBackground
                 , entities =
                     [ grid
-                    , finalCsg
-                        |> Csg.toMesh
-                        |> renderCsg
+                    , finalCsgMesh
                     ]
                 , upDirection = Direction3d.positiveY
                 }

@@ -39,9 +39,9 @@ type alias Model =
     { azimuth : Angle -- Orbiting angle of the camera around the focal point
     , elevation : Angle -- Angle of the camera up from the XY plane
     , orbiting : Bool -- Whether the mouse button is currently down
-    , mesh1 : Mesh.Plain WorldCoordinates -- Saved Mesh values for rendering
-    , mesh2 : Mesh.Plain WorldCoordinates
     , clipPlanePosition : Float
+    , mesh : Scene3d.Entity WorldCoordinates
+    , showAxis : Bool
     }
 
 
@@ -56,29 +56,12 @@ init : () -> ( Model, Cmd Msg )
 init () =
     -- Create a couple of Mesh values containing a single triangle each and
     -- store them in the model
-    let
-        mesh1 =
-            Mesh.triangles
-                [ Triangle3d.from
-                    (Point3d.meters 0 0 0)
-                    (Point3d.meters 1 0 0)
-                    (Point3d.meters 1 1 0)
-                ]
-
-        mesh2 =
-            Mesh.triangles
-                [ Triangle3d.from
-                    (Point3d.meters 0 0 0)
-                    (Point3d.meters 1 1 0)
-                    (Point3d.meters 0 1 0)
-                ]
-    in
     ( { azimuth = Angle.degrees -60
       , elevation = Angle.degrees 30
       , orbiting = False
       , clipPlanePosition = -0.5
-      , mesh1 = mesh1
-      , mesh2 = mesh2
+      , mesh = finalCsgMesh
+      , showAxis = True
       }
     , Cmd.none
     )
@@ -253,7 +236,7 @@ finalCsg4 =
         |> Csg.scaleBy (Vector3d.meters 0.5 1 1)
 
 
-finalCsg =
+finalCsg5 =
     let
         dotRadius =
             Length.centimeters 8
@@ -339,7 +322,45 @@ finalCsg =
     -}
     sphere
         |> Csg.scaleBy (Vector3d.meters 1.5 0.5 1)
-        |> Csg.subtractFrom cube
+        |> Csg.union cube
+        |> Csg.rotateAround Axis3d.x (Angle.degrees -45)
+
+
+finalCsg =
+    let
+        cone =
+            Csg.cone (Length.meters 0.5) (Length.meters 0.5)
+
+        twoCones =
+            Csg.group
+                [ cone
+                , cone
+                    |> Csg.rotateAround Axis3d.x (Angle.degrees 180)
+                ]
+
+        halfCones =
+            (Csg.cube (Length.meters 1)
+                |> Csg.translateBy (Vector3d.meters -0.5 0 0.5)
+            )
+                |> Csg.subtractFrom
+                    twoCones
+
+        sphericon =
+            Csg.group
+                [ halfCones
+                , halfCones
+                    |> Csg.rotateAround Axis3d.z (Angle.degrees 180)
+                    |> Csg.rotateAround Axis3d.y (Angle.degrees 90)
+                ]
+                |> Csg.withColor Color.orange
+    in
+    Csg.group
+        [ sphericon
+        , sphericon
+            |> Csg.scaleBy (Vector3d.meters 1.2 1 0.5)
+            |> Csg.translateBy (Vector3d.meters 1.2 0 0)
+            |> Csg.withColor Color.green
+        ]
 
 
 
@@ -570,7 +591,7 @@ finalCsgLines =
     finalCsg
         |> Csg.toLines
         |> Mesh.lineSegments
-        |> Scene3d.mesh (Material.color Color.green)
+        |> Scene3d.mesh (Material.color Color.black)
 
 
 finalCsgMesh =
@@ -614,8 +635,7 @@ view model =
                 , clipDepth = Length.meters 0.1
                 , dimensions = ( Pixels.int 70, Pixels.int 70 )
                 , background = Scene3d.transparentBackground
-                , entities =
-                    [ originCross ]
+                , entities = [ originCross ]
                 , upDirection = Direction3d.positiveY
                 }
             , Html.span
@@ -631,9 +651,15 @@ view model =
                 , dimensions = ( Pixels.int 800, Pixels.int 800 )
                 , background = Scene3d.transparentBackground
                 , entities =
-                    [ grid
-                    , finalCsgMesh
-                    ]
+                    (if model.showAxis then
+                        [ grid ]
+
+                     else
+                        []
+                    )
+                        ++ [ model.mesh
+                           , finalCsgLines
+                           ]
                 , upDirection = Direction3d.positiveY
                 }
             ]

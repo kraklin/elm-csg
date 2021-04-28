@@ -235,26 +235,62 @@ sphereWith { slices, stacks } radius =
 
 cylinder : Length -> Point3d Meters c -> Point3d Meters c -> Csg c
 cylinder radius start end =
+    coneWith
+        { slices = 16 }
+        { bottomRadius = radius
+        , topRadius = radius
+        , bottomPoint = start
+        , topPoint = end
+        }
+
+
+cone :
+    Length
+    -> Length
+    -> Csg c
+cone radius height =
+    coneWith { slices = 16 }
+        { bottomRadius = radius
+        , bottomPoint = Point3d.origin
+        , topPoint = Point3d.xyz (Length.meters 0) (Length.meters 0) height
+        , topRadius = Length.meters 0
+        }
+
+
+coneWith :
+    { slices : Int }
+    ->
+        { bottomRadius : Length
+        , bottomPoint : Point3d Meters c
+        , topPoint : Point3d Meters c
+        , topRadius : Length
+        }
+    -> Csg c
+coneWith { slices } { bottomRadius, bottomPoint, topRadius, topPoint } =
     let
-        slices =
-            16
-
         vector =
-            Vector3d.from start end
+            Vector3d.from bottomPoint topPoint
 
-        initialPoint =
+        initialPointBottom =
             Point3d.translateBy
                 (Vector3d.perpendicularTo vector
-                    |> Vector3d.scaleTo radius
+                    |> Vector3d.scaleTo bottomRadius
                 )
-                start
+                bottomPoint
+
+        initialPointTop =
+            Point3d.translateBy
+                (Vector3d.perpendicularTo vector
+                    |> Vector3d.scaleTo topRadius
+                )
+                topPoint
 
         deltaPhi =
             Angle.turns (1 / toFloat slices)
 
         maybeRotationAxis =
             Vector3d.direction vector
-                |> Maybe.map (Axis3d.through start)
+                |> Maybe.map (Axis3d.through bottomPoint)
 
         bottomPoints =
             List.range 0 (slices - 1)
@@ -263,33 +299,53 @@ cylinder radius start end =
                         maybeRotationAxis
                             |> Maybe.map
                                 (\axis ->
-                                    ( Point3d.rotateAround axis (deltaPhi |> Quantity.multiplyBy (toFloat idx)) initialPoint
-                                    , Point3d.rotateAround axis (deltaPhi |> Quantity.multiplyBy (toFloat (idx + 1))) initialPoint
+                                    ( Point3d.rotateAround axis
+                                        (deltaPhi
+                                            |> Quantity.multiplyBy (toFloat idx)
+                                        )
+                                        initialPointBottom
+                                    , Point3d.rotateAround axis
+                                        (deltaPhi
+                                            |> Quantity.multiplyBy (toFloat (idx + 1))
+                                        )
+                                        initialPointBottom
                                     )
                                 )
                     )
 
         topPoints =
-            bottomPoints
-                |> List.map
-                    (\( p1, p2 ) ->
-                        ( Point3d.translateBy vector p1
-                        , Point3d.translateBy vector p2
-                        )
+            List.range 0 (slices - 1)
+                |> List.filterMap
+                    (\idx ->
+                        maybeRotationAxis
+                            |> Maybe.map
+                                (\axis ->
+                                    ( Point3d.rotateAround axis
+                                        (deltaPhi
+                                            |> Quantity.multiplyBy (toFloat idx)
+                                        )
+                                        initialPointTop
+                                    , Point3d.rotateAround axis
+                                        (deltaPhi
+                                            |> Quantity.multiplyBy (toFloat (idx + 1))
+                                        )
+                                        initialPointTop
+                                    )
+                                )
                     )
 
         bottom =
             bottomPoints
                 |> List.filterMap
                     (\( p1, p2 ) ->
-                        toFace [ p1, start, p2 ]
+                        toFace [ p1, bottomPoint, p2 ]
                     )
 
         top =
             topPoints
                 |> List.filterMap
                     (\( p1, p2 ) ->
-                        toFace [ p1, p2, end ]
+                        toFace [ p1, p2, topPoint ]
                     )
 
         sides =
@@ -495,7 +551,8 @@ toLines (Csg tree) =
             [ LineSegment3d.from v1.position v2.position
             , LineSegment3d.from v2.position v3.position
             , LineSegment3d.from v3.position v1.position
-            , LineSegment3d.from (centroid ( v1, v2, v3 )) (normalEnd ( v1, v2, v3 ))
+
+            --, LineSegment3d.from (centroid ( v1, v2, v3 )) (normalEnd ( v1, v2, v3 ))
             ]
     in
     tree

@@ -192,11 +192,12 @@ final =
                 |> Csg.union cylinderY
                 |> Csg.union cylinderZ
                 |> Csg.withColor Color.green
-                |> Csg.rotateAround Axis3d.y (Angle.degrees 45)
     in
-    cube
-        |> Csg.intersectWith sphere
-        |> Csg.subtractFrom cylinders
+    cylinders
+        |> Csg.subtractFrom
+            (cube
+                |> Csg.intersectWith sphere
+            )
         |> Csg.translateBy (Vector3d.meters 0 0.5 0)
         |> Csg.withColor Color.yellow
 
@@ -327,6 +328,10 @@ finalCsg5 =
 
 
 finalCsg =
+    cube |> Csg.intersectWith cube2
+
+
+finalCsg6 =
     let
         cone =
             Csg.cone (Length.meters 0.5) (Length.meters 0.5)

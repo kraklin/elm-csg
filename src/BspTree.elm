@@ -115,23 +115,13 @@ insert face tree =
             Node <| newNode facePlane face
 
         Node rootData ->
-            divide rootData.plane face
-                |> (\{ inside, outside } ->
+            splitByPlane rootData.plane face
+                |> (\{ front, back } ->
                         rootData
-                            |> handleOutside facePlane outside
-                            |> handleInside facePlane inside
+                            |> handleOutside facePlane front
+                            |> handleInside facePlane back
                             |> Node
                    )
-
-
-divide : Plane3d Meters c -> Face c -> { inside : Maybe (Face c), outside : Maybe (Face c) }
-divide splittingPlane face =
-    splitByPlane splittingPlane face
-        |> (\{ front, back } ->
-                { inside = back
-                , outside = front
-                }
-           )
 
 
 fromPoints : Direction3d coordinates -> Color -> List (Point3d Meters coordinates) -> Maybe (Face coordinates)
@@ -372,9 +362,9 @@ clipFace clippedFace clippingTree =
                 []
 
             else
-                divide rootData.plane clippedFace
-                    |> (\{ inside, outside } ->
-                            handleInside inside rootData.inside ++ handleOutside outside rootData.outside
+                splitByPlane rootData.plane clippedFace
+                    |> (\{ back, front } ->
+                            handleInside back rootData.inside ++ handleOutside front rootData.outside
                        )
 
 
@@ -497,7 +487,8 @@ splitByPlane plane face =
 
         isFront : Face c -> Bool
         isFront face_ =
-            face_.normalDirection
+            face_
+                |> .normalDirection
                 |> Direction3d.toVector
                 |> Vector3d.dot
                     (Plane3d.normalDirection plane

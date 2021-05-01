@@ -398,76 +398,63 @@ coneWith { slices } { bottomRadius, bottomPoint, topRadius, topPoint } =
 -- Operations
 
 
-subtractFrom : Csg c -> Csg c -> Csg c
-subtractFrom (Csg t2) (Csg t1) =
-    let
-        a =
-            t1
-                |> BspTree.invert
-                |> BspTree.clip t2
-
-        b =
-            t2
-                |> BspTree.clip a
-                |> BspTree.toFaces
-    in
-    (BspTree.toFaces a ++ b)
-        |> BspTree.build
-        |> Csg
-
-
 intersectWith : Csg c -> Csg c -> Csg c
 intersectWith (Csg t1) (Csg t2) =
     let
         a =
             t1
-                |> BspTree.invert
-                |> BspTree.clip t2
-                |> BspTree.invert
                 |> BspTree.toFaces
+                |> List.map (BspTree.findInside BspTree.Same t2)
+                |> List.concat
 
         b =
             t2
-                |> BspTree.invert
-                |> BspTree.clip t1
-                |> BspTree.invert
                 |> BspTree.toFaces
+                |> List.map (BspTree.findInside BspTree.None t1)
+                |> List.concat
     in
     (a ++ b)
         |> BspTree.build
         |> Csg
 
 
-union : Csg c -> Csg c -> Csg c
-union (Csg t1) (Csg t2) =
+unionWith : Csg c -> Csg c -> Csg c
+unionWith (Csg t1) (Csg t2) =
     let
         a =
             t1
-                |> BspTree.clip
-                    (t2
-                        |> BspTree.invert
-                        |> BspTree.clip t1
-                    )
                 |> BspTree.toFaces
+                |> List.map (BspTree.findOutside BspTree.Same t2)
+                |> List.concat
 
         b =
             t2
-                |> BspTree.clip
-                    (t1
-                        |> BspTree.invert
-                        |> BspTree.clip t2
-                    )
                 |> BspTree.toFaces
+                |> List.map (BspTree.findOutside BspTree.None t1)
+                |> List.concat
     in
     (a ++ b)
         |> BspTree.build
         |> Csg
 
 
-invert : Csg c -> Csg c
-invert (Csg tree) =
-    tree
-        |> BspTree.invert
+subtractFrom : Csg c -> Csg c -> Csg c
+subtractFrom (Csg t1) (Csg t2) =
+    let
+        a =
+            t1
+                |> BspTree.toFaces
+                |> List.map (BspTree.findOutside BspTree.Opposite t2)
+                |> List.concat
+
+        b =
+            t2
+                |> BspTree.toFaces
+                |> List.map (BspTree.findInside BspTree.None t1)
+                |> List.concat
+    in
+    (a ++ b)
+        |> BspTree.build
         |> Csg
 
 

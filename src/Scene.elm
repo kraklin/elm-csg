@@ -189,8 +189,8 @@ final =
     let
         cylinders =
             cylinderX
-                |> Csg.union cylinderY
-                |> Csg.union cylinderZ
+                |> Csg.unionWith cylinderY
+                |> Csg.unionWith cylinderZ
                 |> Csg.withColor Color.green
     in
     cylinders
@@ -237,7 +237,7 @@ finalCsg4 =
         |> Csg.scaleBy (Vector3d.meters 0.5 1 1)
 
 
-finalCsg5 =
+finalCsg =
     let
         dotRadius =
             Length.centimeters 8
@@ -314,23 +314,19 @@ finalCsg5 =
                 ]
                 |> Csg.withColor Color.white
     in
-    {-
-       dots
-           |> Csg.subtractFrom base
-           |> Csg.translateBy (Vector3d.meters -0.5 -0.5 0.5)
-           |> Csg.scaleBy (Vector3d.meters 2 1 1)
-           |> Csg.rotateAround Axis3d.x (Angle.degrees -45)
-    -}
-    sphere
-        |> Csg.scaleBy (Vector3d.meters 1.5 0.5 1)
-        |> Csg.union cube
+    dots
+        |> Csg.subtractFrom base
+        |> Csg.translateBy (Vector3d.meters -0.5 -0.5 0.5)
+        |> Csg.scaleBy (Vector3d.meters 2 1 1)
         |> Csg.rotateAround Axis3d.x (Angle.degrees -45)
 
 
-finalCsg =
-    sphere
-        |> Csg.scaleBy (Vector3d.meters 1.5 0.5 1)
-        |> Csg.union cube
+finalCsg7 =
+    --|> Csg.scaleBy (Vector3d.meters 1.5 0.5 1)
+    (Csg.cube (Length.meters 1)
+        |> Csg.translateBy (Vector3d.meters -0.5 0 0.5)
+    )
+        |> Csg.unionWith cube
 
 
 finalCsg6 =

@@ -368,6 +368,138 @@ clipFace clippedFace clippingTree =
                        )
 
 
+type Orientation
+    = Same
+    | Opposite
+    | None
+
+
+getOrientation : Plane3d Meters c -> ClassifiedFace c -> Orientation
+getOrientation plane face =
+    let
+        facePlaneDotProduct =
+            Vector3d.dot (Direction3d.toVector face.normalDirection) (Direction3d.toVector (Plane3d.normalDirection plane))
+                |> Quantity.unwrap
+
+        areSame =
+            facePlaneDotProduct > -epsilon || facePlaneDotProduct < epsilon
+    in
+    Debug.log "orientation" <|
+        if face.class == Coplanar && areSame then
+            Same
+
+        else
+            Opposite
+
+
+findInside : Orientation -> BspTree c -> Face c -> List (Face c)
+findInside orientation tree face =
+    case tree of
+        Empty ->
+            []
+
+        Node nodeData ->
+            let
+                classification =
+                    classifyFace nodeData.plane face
+
+                handleInside : Maybe (Face c) -> BspTree c -> List (Face c)
+                handleInside maybeFace tree_ =
+                    maybeFace
+                        |> Maybe.map
+                            (\face_ ->
+                                case tree_ of
+                                    Empty ->
+                                        [ face_ ]
+
+                                    Node _ ->
+                                        findInside orientation tree_ face_
+                            )
+                        |> Maybe.withDefault []
+
+                handleOutside : Maybe (Face c) -> BspTree c -> List (Face c)
+                handleOutside maybeFace tree_ =
+                    maybeFace
+                        |> Maybe.map
+                            (\face_ ->
+                                case tree_ of
+                                    Empty ->
+                                        []
+
+                                    Node _ ->
+                                        findInside orientation tree_ face_
+                            )
+                        |> Maybe.withDefault []
+            in
+            (if classification.class == Coplanar then
+                if getOrientation nodeData.plane classification == orientation then
+                    { back = Just face, front = Nothing }
+
+                else
+                    { back = Nothing, front = Just face }
+
+             else
+                splitByPlane nodeData.plane face
+            )
+                |> (\{ back, front } ->
+                        handleInside back nodeData.inside ++ handleOutside front nodeData.outside
+                   )
+
+
+findOutside : Orientation -> BspTree c -> Face c -> List (Face c)
+findOutside orientation tree face =
+    case tree of
+        Empty ->
+            []
+
+        Node nodeData ->
+            let
+                classification =
+                    classifyFace nodeData.plane face
+
+                handleInside : Maybe (Face c) -> BspTree c -> List (Face c)
+                handleInside maybeFace tree_ =
+                    maybeFace
+                        |> Maybe.map
+                            (\face_ ->
+                                case tree_ of
+                                    Empty ->
+                                        []
+
+                                    Node _ ->
+                                        findOutside orientation tree_ face_
+                            )
+                        |> Maybe.withDefault []
+
+                handleOutside : Maybe (Face c) -> BspTree c -> List (Face c)
+                handleOutside maybeFace tree_ =
+                    maybeFace
+                        |> Maybe.map
+                            (\face_ ->
+                                case tree_ of
+                                    Empty ->
+                                        [ face_ ]
+
+                                    Node _ ->
+                                        findOutside orientation tree_ face_
+                            )
+                        |> Maybe.withDefault []
+            in
+            (if classification.class == Coplanar then
+                if getOrientation nodeData.plane classification == orientation then
+                    { back = Nothing, front = Just face }
+
+                else
+                    { back = Just face, front = Nothing }
+
+             else
+                splitByPlane nodeData.plane face
+            )
+                |> (\{ back, front } ->
+                        handleInside back nodeData.inside ++ handleOutside front nodeData.outside
+                   )
+
+
 dedup : List (Point3d Meters c) -> List (Point3d Meters c)
 dedup list =
     list
@@ -398,6 +530,7 @@ type alias ClassifiedVertex c =
 type alias ClassifiedFace c =
     { points : List (ClassifiedVertex c)
     , class : Classification
+    , normalDirection : Direction3d c
     }
 
 
@@ -476,6 +609,7 @@ classifyFace plane face =
     in
     { class = combinedClasses
     , points = classifiedPoints
+    , normalDirection = face.normalDirection
     }
 
 

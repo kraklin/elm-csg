@@ -328,7 +328,9 @@ finalCsg5 =
 
 
 finalCsg =
-    cube |> Csg.intersectWith cube2
+    sphere
+        |> Csg.scaleBy (Vector3d.meters 1.5 0.5 1)
+        |> Csg.union cube
 
 
 finalCsg6 =

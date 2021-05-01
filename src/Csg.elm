@@ -52,6 +52,38 @@ toFace points =
 -- Solids construction
 
 
+yzPlane : Csg coordinates
+yzPlane =
+    let
+        size =
+            Length.meters 2
+
+        negSize =
+            Length.meters -2
+
+        z =
+            Length.meters 0
+
+        a =
+            Point3d.xyz z negSize negSize
+
+        b =
+            Point3d.xyz z size negSize
+
+        c =
+            Point3d.xyz z size size
+
+        d =
+            Point3d.xyz z negSize size
+
+        rightNormal =
+            Direction3d.x
+    in
+    [ Face ( a, [ b, c, d ] ) rightNormal defaultColor ]
+        |> BspTree.build
+        |> Csg
+
+
 cube : Length -> Csg coordinates
 cube size =
     cuboid { width = size, height = size, depth = size }

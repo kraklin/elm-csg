@@ -15,11 +15,61 @@ import Quantity
 import Vector3d exposing (Vector3d)
 
 
+epsilon : Float
+epsilon =
+    1.0e-5
+
+
 type alias Face c =
     { points : NonEmpty (Point3d Meters c)
     , normalDirection : Direction3d c
     , color : Color
     }
+
+
+type alias NodeData c =
+    { faces : NonEmpty (Face c)
+    , outside : BspTree c
+    , inside : BspTree c
+    , plane : Plane3d Meters c
+    }
+
+
+type Orientation
+    = Same
+    | Opposite
+    | None
+
+
+type alias IntersectionResult c =
+    { outside : Maybe (Face c)
+    , inside : Maybe (Face c)
+    }
+
+
+type Classification
+    = Coplanar
+    | Outside
+    | Inside
+    | Spanning
+
+
+type alias ClassifiedVertex c =
+    { point : Point3d Meters c
+    , class : Classification
+    }
+
+
+type alias ClassifiedFace c =
+    { points : List (ClassifiedVertex c)
+    , class : Classification
+    , normalDirection : Direction3d c
+    }
+
+
+type BspTree c
+    = Node (NodeData c)
+    | Empty
 
 
 allPoints : Face c -> List (Point3d Meters c)
@@ -35,19 +85,6 @@ toFacePoints points =
 planeFromFace : Face c -> Plane3d Meters c
 planeFromFace { points, normalDirection } =
     Plane3d.through (Tuple.first points) normalDirection
-
-
-type alias NodeData c =
-    { faces : NonEmpty (Face c)
-    , outside : BspTree c
-    , inside : BspTree c
-    , plane : Plane3d Meters c
-    }
-
-
-type BspTree c
-    = Node (NodeData c)
-    | Empty
 
 
 empty : BspTree c
@@ -116,10 +153,10 @@ insert face tree =
 
         Node rootData ->
             splitByPlane rootData.plane face
-                |> (\{ front, back } ->
+                |> (\{ outside, inside } ->
                         rootData
-                            |> handleOutside facePlane front
-                            |> handleInside facePlane back
+                            |> handleOutside facePlane outside
+                            |> handleInside facePlane inside
                             |> Node
                    )
 
@@ -286,94 +323,6 @@ scaleBy vector tree =
                 }
 
 
-clip : BspTree c -> BspTree c -> BspTree c
-clip t1 t2 =
-    t2
-        |> toFaces
-        |> List.map (\f -> clipFace f t1)
-        |> List.concat
-        |> build
-
-
-invert : BspTree c -> BspTree c
-invert tree =
-    let
-        invertFace : Face c -> Face c
-        invertFace f =
-            { f
-                | points = NonEmpty.reverse f.points
-                , normalDirection = Direction3d.reverse f.normalDirection
-            }
-    in
-    case tree of
-        Empty ->
-            Empty
-
-        Node nodeData ->
-            Node
-                { nodeData
-                    | faces = NonEmpty.map invertFace nodeData.faces
-                    , inside = invert nodeData.inside
-                    , outside = invert nodeData.outside
-                    , plane = Plane3d.flip nodeData.plane
-                }
-
-
-clipFace : Face c -> BspTree c -> List (Face c)
-clipFace clippedFace clippingTree =
-    let
-        arePlanesSame treePlane face =
-            treePlane == planeFromFace face
-
-        handleInside : Maybe (Face c) -> BspTree c -> List (Face c)
-        handleInside maybeFace tree =
-            maybeFace
-                |> Maybe.map
-                    (\face ->
-                        case tree of
-                            Empty ->
-                                [ face ]
-
-                            Node _ ->
-                                clipFace face tree
-                    )
-                |> Maybe.withDefault []
-
-        handleOutside : Maybe (Face c) -> BspTree c -> List (Face c)
-        handleOutside maybeFace tree =
-            maybeFace
-                |> Maybe.map
-                    (\face ->
-                        case tree of
-                            Empty ->
-                                []
-
-                            Node _ ->
-                                clipFace face tree
-                    )
-                |> Maybe.withDefault []
-    in
-    case clippingTree of
-        Empty ->
-            []
-
-        Node rootData ->
-            if arePlanesSame rootData.plane clippedFace then
-                []
-
-            else
-                splitByPlane rootData.plane clippedFace
-                    |> (\{ back, front } ->
-                            handleInside back rootData.inside ++ handleOutside front rootData.outside
-                       )
-
-
-type Orientation
-    = Same
-    | Opposite
-    | None
-
-
 getOrientation : Plane3d Meters c -> ClassifiedFace c -> Orientation
 getOrientation plane face =
     let
@@ -384,12 +333,11 @@ getOrientation plane face =
         areSame =
             facePlaneDotProduct > -epsilon || facePlaneDotProduct < epsilon
     in
-    Debug.log "orientation" <|
-        if face.class == Coplanar && areSame then
-            Same
+    if face.class == Coplanar && areSame then
+        Same
 
-        else
-            Opposite
+    else
+        Opposite
 
 
 findInside : Orientation -> BspTree c -> Face c -> List (Face c)
@@ -433,16 +381,16 @@ findInside orientation tree face =
             in
             (if classification.class == Coplanar then
                 if getOrientation nodeData.plane classification == orientation then
-                    { back = Just face, front = Nothing }
+                    { inside = Just face, outside = Nothing }
 
                 else
-                    { back = Nothing, front = Just face }
+                    { inside = Nothing, outside = Just face }
 
              else
                 splitByPlane nodeData.plane face
             )
-                |> (\{ back, front } ->
-                        handleInside back nodeData.inside ++ handleOutside front nodeData.outside
+                |> (\{ inside, outside } ->
+                        handleInside inside nodeData.inside ++ handleOutside outside nodeData.outside
                    )
 
 
@@ -487,16 +435,16 @@ findOutside orientation tree face =
             in
             (if classification.class == Coplanar then
                 if getOrientation nodeData.plane classification == orientation then
-                    { back = Nothing, front = Just face }
+                    { inside = Nothing, outside = Just face }
 
                 else
-                    { back = Just face, front = Nothing }
+                    { inside = Just face, outside = Nothing }
 
              else
                 splitByPlane nodeData.plane face
             )
-                |> (\{ back, front } ->
-                        handleInside back nodeData.inside ++ handleOutside front nodeData.outside
+                |> (\{ inside, outside } ->
+                        handleInside inside nodeData.inside ++ handleOutside outside nodeData.outside
                    )
 
 
@@ -508,42 +456,16 @@ dedup list =
         |> Dict.values
 
 
-type alias IntersectionResult c =
-    { front : Maybe (Face c)
-    , back : Maybe (Face c)
-    }
-
-
-type Classification
-    = Coplanar
-    | Front
-    | Back
-    | Spanning
-
-
-type alias ClassifiedVertex c =
-    { point : Point3d Meters c
-    , class : Classification
-    }
-
-
-type alias ClassifiedFace c =
-    { points : List (ClassifiedVertex c)
-    , class : Classification
-    , normalDirection : Direction3d c
-    }
-
-
 classToNumber : Classification -> Int
 classToNumber class =
     case class of
         Coplanar ->
             0
 
-        Front ->
+        Outside ->
             1
 
-        Back ->
+        Inside ->
             2
 
         Spanning ->
@@ -557,17 +479,13 @@ numberToClass class =
             Coplanar
 
         1 ->
-            Front
+            Outside
 
         2 ->
-            Back
+            Inside
 
         _ ->
             Spanning
-
-
-epsilon =
-    1.0e-5
 
 
 combineClasses : Classification -> Classification -> Classification
@@ -590,10 +508,10 @@ classifyFace plane face =
                 |> Quantity.unwrap
                 |> (\result ->
                         if result < -epsilon then
-                            Back
+                            Inside
 
                         else if result > epsilon then
-                            Front
+                            Outside
 
                         else
                             Coplanar
@@ -619,8 +537,8 @@ splitByPlane plane face =
         classifiedFace =
             classifyFace plane face
 
-        isFront : Face c -> Bool
-        isFront face_ =
+        isOutside : Face c -> Bool
+        isOutside face_ =
             face_
                 |> .normalDirection
                 |> Direction3d.toVector
@@ -632,17 +550,17 @@ splitByPlane plane face =
     in
     case classifiedFace.class of
         Coplanar ->
-            if isFront face then
-                { front = Just face, back = Nothing }
+            if isOutside face then
+                { outside = Just face, inside = Nothing }
 
             else
-                { front = Nothing, back = Just face }
+                { outside = Nothing, inside = Just face }
 
-        Front ->
-            { front = Just face, back = Nothing }
+        Outside ->
+            { outside = Just face, inside = Nothing }
 
-        Back ->
-            { front = Nothing, back = Just face }
+        Inside ->
+            { outside = Nothing, inside = Just face }
 
         Spanning ->
             let
@@ -672,15 +590,15 @@ splitByPlane plane face =
                     else
                         Nothing
 
-                maybeFrontPoint ( t1, _ ) =
-                    if t1.class == Front || t1.class == Coplanar then
+                maybeOutsidePoint ( t1, _ ) =
+                    if t1.class == Outside || t1.class == Coplanar then
                         Just t1.point
 
                     else
                         Nothing
 
-                maybeBackPoint ( t1, _ ) =
-                    if t1.class == Back || t1.class == Coplanar then
+                maybeInsidePoint ( t1, _ ) =
+                    if t1.class == Inside || t1.class == Coplanar then
                         Just t1.point
 
                     else
@@ -708,16 +626,16 @@ splitByPlane plane face =
             pairs
                 |> List.map
                     (\tuple ->
-                        { front = [ maybeFrontPoint tuple, maybeSplitPoint tuple ] |> List.filterMap identity
-                        , back = [ maybeBackPoint tuple, maybeSplitPoint tuple ] |> List.filterMap identity
+                        { outside = [ maybeOutsidePoint tuple, maybeSplitPoint tuple ] |> List.filterMap identity
+                        , inside = [ maybeInsidePoint tuple, maybeSplitPoint tuple ] |> List.filterMap identity
                         }
                     )
                 |> List.foldl
-                    (\{ front, back } acc ->
+                    (\{ outside, inside } acc ->
                         { acc
-                            | front = acc.front ++ front
-                            , back = acc.back ++ back
+                            | outside = acc.outside ++ outside
+                            , inside = acc.inside ++ inside
                         }
                     )
-                    { front = [], back = [] }
-                |> (\{ front, back } -> { front = toFace front, back = toFace back })
+                    { outside = [], inside = [] }
+                |> (\{ outside, inside } -> { outside = toFace outside, inside = toFace inside })

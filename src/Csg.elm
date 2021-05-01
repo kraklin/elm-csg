@@ -14,10 +14,6 @@ import Triangle3d
 import Vector3d exposing (Vector3d)
 
 
-type XYZCoordinates
-    = XYZCoordinates
-
-
 type Csg c
     = Csg (BspTree c)
 
@@ -99,37 +95,37 @@ cuboid { width, height, depth } =
             Point3d.meters 0 0 0
 
         b =
-            Point3d.xyz z height z
+            Point3d.xyz z z height
 
         c =
-            Point3d.xyz width height z
+            Point3d.xyz width z height
 
         d =
             Point3d.xyz width z z
 
         e =
-            Point3d.xyz z z (Quantity.negate depth)
+            Point3d.xyz z depth z
 
         f =
-            Point3d.xyz z height (Quantity.negate depth)
+            Point3d.xyz z depth height
 
         g =
-            Point3d.xyz width height (Quantity.negate depth)
+            Point3d.xyz width depth height
 
         h =
-            Point3d.xyz width z (Quantity.negate depth)
+            Point3d.xyz width depth z
 
         frontNormal =
-            Direction3d.z
+            Direction3d.negativeY
 
         backNormal =
-            Direction3d.negativeZ
-
-        topNormal =
             Direction3d.y
 
+        topNormal =
+            Direction3d.z
+
         bottomNormal =
-            Direction3d.negativeY
+            Direction3d.negativeZ
 
         leftNormal =
             Direction3d.negativeX
@@ -570,8 +566,7 @@ toLines (Csg tree) =
             [ LineSegment3d.from v1.position v2.position
             , LineSegment3d.from v2.position v3.position
             , LineSegment3d.from v3.position v1.position
-
-            --, LineSegment3d.from (centroid ( v1, v2, v3 )) (normalEnd ( v1, v2, v3 ))
+            , LineSegment3d.from (centroid ( v1, v2, v3 )) (normalEnd ( v1, v2, v3 ))
             ]
     in
     tree

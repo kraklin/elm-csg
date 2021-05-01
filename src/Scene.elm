@@ -154,7 +154,7 @@ renderCsg trianglesList =
 cube =
     --Csg.sphere (Length.meters 0.7)
     Csg.cube (Length.meters 1)
-        |> Csg.translateBy (Vector3d.meters -0.5 -0.5 0.5)
+        |> Csg.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
         |> Csg.withColor Color.red
 
 
@@ -185,7 +185,7 @@ cylinderZ =
     Csg.cylinder (Length.centimeters 40) (Point3d.meters 0 0 -1) (Point3d.meters 0 0 1)
 
 
-final =
+finalCsg =
     let
         cylinders =
             cylinderX
@@ -198,8 +198,10 @@ final =
             (cube
                 |> Csg.intersectWith sphere
             )
-        |> Csg.translateBy (Vector3d.meters 0 0.5 0)
-        |> Csg.withColor Color.yellow
+
+
+
+--|> Csg.withColor Color.yellow
 
 
 finalCsg3 =
@@ -237,7 +239,7 @@ finalCsg4 =
         |> Csg.scaleBy (Vector3d.meters 0.5 1 1)
 
 
-finalCsg =
+finalCsg5 =
     let
         dotRadius =
             Length.centimeters 8

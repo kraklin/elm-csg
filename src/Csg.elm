@@ -1,500 +1,22 @@
-module Csg exposing (..)
+module Csg exposing
+    ( toLines
+    , toMesh
+    , toTriangularMesh
+    , toTriangularMeshGroupedByColor
+    )
 
-import Angle exposing (Angle)
-import Axis3d exposing (Axis3d)
-import BspTree exposing (BspTree, Face)
+import BspTree exposing (Face)
 import Color exposing (Color)
+import Csg.Shape3d exposing (Shape3d)
+import Dict exposing (Dict)
 import Direction3d
-import Length exposing (Length, Meters)
+import Length exposing (Meters)
 import LineSegment3d exposing (LineSegment3d)
 import List.NonEmpty as NonEmpty
 import Point3d exposing (Point3d)
 import Quantity exposing (Unitless)
-import Triangle3d
+import TriangularMesh exposing (TriangularMesh)
 import Vector3d exposing (Vector3d)
-
-
-type Csg c
-    = Csg (BspTree c)
-
-
-defaultColor : Color
-defaultColor =
-    Color.yellow
-
-
-toFace : List (Point3d Meters c) -> Maybe (Face c)
-toFace points =
-    let
-        maybeNormal tri =
-            tri
-                |> Triangle3d.normalDirection
-    in
-    case points of
-        v1 :: v2 :: v3 :: rest ->
-            maybeNormal (Triangle3d.from v1 v2 v3)
-                |> Maybe.map
-                    (\normal ->
-                        Face (NonEmpty.fromCons v1 (v2 :: v3 :: rest))
-                            normal
-                            defaultColor
-                    )
-
-        _ ->
-            Nothing
-
-
-
--- Solids construction
-
-
-yzPlane : Csg coordinates
-yzPlane =
-    let
-        size =
-            Length.meters 2
-
-        negSize =
-            Length.meters -2
-
-        z =
-            Length.meters 0
-
-        a =
-            Point3d.xyz z negSize negSize
-
-        b =
-            Point3d.xyz z size negSize
-
-        c =
-            Point3d.xyz z size size
-
-        d =
-            Point3d.xyz z negSize size
-
-        rightNormal =
-            Direction3d.x
-    in
-    [ Face ( a, [ b, c, d ] ) rightNormal defaultColor ]
-        |> BspTree.build
-        |> Csg
-
-
-cube : Length -> Csg coordinates
-cube size =
-    cuboid { width = size, height = size, depth = size }
-
-
-cuboid : { width : Length, height : Length, depth : Length } -> Csg coordinates
-cuboid { width, height, depth } =
-    let
-        z =
-            Length.meters 0
-
-        a =
-            Point3d.meters 0 0 0
-
-        b =
-            Point3d.xyz z z height
-
-        c =
-            Point3d.xyz width z height
-
-        d =
-            Point3d.xyz width z z
-
-        e =
-            Point3d.xyz z depth z
-
-        f =
-            Point3d.xyz z depth height
-
-        g =
-            Point3d.xyz width depth height
-
-        h =
-            Point3d.xyz width depth z
-
-        frontNormal =
-            Direction3d.negativeY
-
-        backNormal =
-            Direction3d.y
-
-        topNormal =
-            Direction3d.z
-
-        bottomNormal =
-            Direction3d.negativeZ
-
-        leftNormal =
-            Direction3d.negativeX
-
-        rightNormal =
-            Direction3d.x
-
-        front =
-            Face ( a, [ d, c, b ] ) frontNormal defaultColor
-
-        back =
-            Face ( e, [ f, g, h ] ) backNormal defaultColor
-
-        top =
-            Face ( b, [ c, g, f ] ) topNormal defaultColor
-
-        bottom =
-            Face ( a, [ e, h, d ] ) bottomNormal defaultColor
-
-        left =
-            Face ( a, [ b, f, e ] ) leftNormal defaultColor
-
-        right =
-            Face ( c, [ d, h, g ] ) rightNormal defaultColor
-    in
-    BspTree.build [ front, back, top, bottom, left, right ]
-        |> Csg
-
-
-type alias SphereSettings =
-    { slices : Int
-    , stacks : Int
-    }
-
-
-sphereDefaults : SphereSettings
-sphereDefaults =
-    { slices = 16
-    , stacks = 8
-    }
-
-
-sphere : Length -> Csg c
-sphere =
-    sphereWith sphereDefaults
-
-
-sphereWith : SphereSettings -> Length -> Csg c
-sphereWith { slices, stacks } radius =
-    let
-        stacks_ =
-            if stacks < 2 then
-                2
-
-            else
-                stacks
-
-        slices_ =
-            if slices < 3 then
-                3
-
-            else
-                slices
-
-        deltaTheta =
-            Angle.turns (0.5 / toFloat stacks_)
-
-        deltaPhi =
-            Angle.turns (1 / toFloat slices_)
-
-        northPoint =
-            Point3d.xyz (Length.meters 0) radius (Length.meters 0)
-
-        vertex ( it, ip ) =
-            northPoint
-                |> Point3d.rotateAround Axis3d.x (Quantity.multiplyBy (toFloat it) deltaTheta)
-                |> Point3d.rotateAround Axis3d.y (Quantity.multiplyBy (toFloat ip) deltaPhi)
-
-        middle : List (Face c)
-        middle =
-            List.range 1 (stacks_ - 2)
-                |> List.map
-                    (\latId ->
-                        List.range 0 (slices_ - 1)
-                            |> List.filterMap
-                                (\long ->
-                                    toFace
-                                        [ vertex ( latId, long )
-                                        , vertex ( latId + 1, long )
-                                        , vertex ( latId + 1, long + 1 )
-                                        , vertex ( latId, long + 1 )
-                                        ]
-                                )
-                    )
-                |> List.concat
-
-        northCap =
-            List.range 0 (slices_ - 1)
-                |> List.filterMap
-                    (\long ->
-                        let
-                            i1 =
-                                northPoint
-
-                            i2 =
-                                vertex ( 1, long )
-
-                            i3 =
-                                vertex ( 1, long + 1 )
-                        in
-                        toFace [ i1, i2, i3 ]
-                    )
-
-        southCap =
-            List.range 0 (slices_ - 1)
-                |> List.filterMap
-                    (\long ->
-                        let
-                            i1 =
-                                vertex ( stacks_ - 1, long )
-
-                            i2 =
-                                vertex ( stacks_, long )
-
-                            i3 =
-                                vertex ( stacks_ - 1, long + 1 )
-                        in
-                        toFace [ i1, i2, i3 ]
-                    )
-    in
-    (northCap ++ middle ++ southCap)
-        |> BspTree.build
-        |> Csg
-
-
-cylinder : Length -> Point3d Meters c -> Point3d Meters c -> Csg c
-cylinder radius start end =
-    coneWith
-        { slices = 16 }
-        { bottomRadius = radius
-        , topRadius = radius
-        , bottomPoint = start
-        , topPoint = end
-        }
-
-
-cone :
-    Length
-    -> Length
-    -> Csg c
-cone radius height =
-    coneWith { slices = 16 }
-        { bottomRadius = radius
-        , bottomPoint = Point3d.origin
-        , topPoint = Point3d.xyz (Length.meters 0) (Length.meters 0) height
-        , topRadius = Length.meters 0
-        }
-
-
-coneWith :
-    { slices : Int }
-    ->
-        { bottomRadius : Length
-        , bottomPoint : Point3d Meters c
-        , topPoint : Point3d Meters c
-        , topRadius : Length
-        }
-    -> Csg c
-coneWith { slices } { bottomRadius, bottomPoint, topRadius, topPoint } =
-    let
-        vector =
-            Vector3d.from bottomPoint topPoint
-
-        initialPointBottom =
-            Point3d.translateBy
-                (Vector3d.perpendicularTo vector
-                    |> Vector3d.scaleTo bottomRadius
-                )
-                bottomPoint
-
-        initialPointTop =
-            Point3d.translateBy
-                (Vector3d.perpendicularTo vector
-                    |> Vector3d.scaleTo topRadius
-                )
-                topPoint
-
-        deltaPhi =
-            Angle.turns (1 / toFloat slices)
-
-        maybeRotationAxis =
-            Vector3d.direction vector
-                |> Maybe.map (Axis3d.through bottomPoint)
-
-        bottomPoints =
-            List.range 0 (slices - 1)
-                |> List.filterMap
-                    (\idx ->
-                        maybeRotationAxis
-                            |> Maybe.map
-                                (\axis ->
-                                    ( Point3d.rotateAround axis
-                                        (deltaPhi
-                                            |> Quantity.multiplyBy (toFloat idx)
-                                        )
-                                        initialPointBottom
-                                    , Point3d.rotateAround axis
-                                        (deltaPhi
-                                            |> Quantity.multiplyBy (toFloat (idx + 1))
-                                        )
-                                        initialPointBottom
-                                    )
-                                )
-                    )
-
-        topPoints =
-            List.range 0 (slices - 1)
-                |> List.filterMap
-                    (\idx ->
-                        maybeRotationAxis
-                            |> Maybe.map
-                                (\axis ->
-                                    ( Point3d.rotateAround axis
-                                        (deltaPhi
-                                            |> Quantity.multiplyBy (toFloat idx)
-                                        )
-                                        initialPointTop
-                                    , Point3d.rotateAround axis
-                                        (deltaPhi
-                                            |> Quantity.multiplyBy (toFloat (idx + 1))
-                                        )
-                                        initialPointTop
-                                    )
-                                )
-                    )
-
-        bottom =
-            bottomPoints
-                |> List.filterMap
-                    (\( p1, p2 ) ->
-                        toFace [ p1, bottomPoint, p2 ]
-                    )
-
-        top =
-            topPoints
-                |> List.filterMap
-                    (\( p1, p2 ) ->
-                        toFace [ p1, p2, topPoint ]
-                    )
-
-        sides =
-            List.map2
-                (\( b1, b2 ) ( t1, t2 ) ->
-                    [ b1, b2, t2, t1 ]
-                )
-                bottomPoints
-                topPoints
-                |> List.filterMap toFace
-    in
-    (bottom ++ sides ++ top)
-        |> BspTree.build
-        |> Csg
-
-
-
--- Operations
-
-
-intersectWith : Csg c -> Csg c -> Csg c
-intersectWith (Csg t1) (Csg t2) =
-    let
-        a =
-            t1
-                |> BspTree.toFaces
-                |> List.map (BspTree.findInside BspTree.Same t2)
-                |> List.concat
-
-        b =
-            t2
-                |> BspTree.toFaces
-                |> List.map (BspTree.findInside BspTree.None t1)
-                |> List.concat
-    in
-    (a ++ b)
-        |> BspTree.build
-        |> Csg
-
-
-unionWith : Csg c -> Csg c -> Csg c
-unionWith (Csg t1) (Csg t2) =
-    let
-        a =
-            t1
-                |> BspTree.toFaces
-                |> List.map (BspTree.findOutside BspTree.Same t2)
-                |> List.concat
-
-        b =
-            t2
-                |> BspTree.toFaces
-                |> List.map (BspTree.findOutside BspTree.None t1)
-                |> List.concat
-    in
-    (a ++ b)
-        |> BspTree.build
-        |> Csg
-
-
-subtractFrom : Csg c -> Csg c -> Csg c
-subtractFrom (Csg t1) (Csg t2) =
-    let
-        a =
-            t1
-                |> BspTree.toFaces
-                |> List.map (BspTree.findOutside BspTree.Opposite t2)
-                |> List.concat
-
-        b =
-            t2
-                |> BspTree.toFaces
-                |> List.map (BspTree.findInside BspTree.None t1)
-                |> List.concat
-    in
-    (a ++ b)
-        |> BspTree.build
-        |> Csg
-
-
-group : List (Csg c) -> Csg c
-group csgs =
-    csgs
-        |> List.foldl (\(Csg tree) acc -> BspTree.toFaces tree ++ acc) []
-        |> BspTree.build
-        |> Csg
-
-
-translateBy : Vector3d Meters c -> Csg c -> Csg c
-translateBy vector (Csg tree) =
-    tree
-        |> BspTree.translate vector
-        |> Csg
-
-
-rotateAround : Axis3d Meters c -> Angle -> Csg c -> Csg c
-rotateAround axis angle (Csg tree) =
-    tree
-        |> BspTree.rotateAround axis angle
-        |> Csg
-
-
-scaleAbout : Point3d Meters c -> Float -> Csg c -> Csg c
-scaleAbout origin factor (Csg tree) =
-    tree
-        |> BspTree.scaleAbout origin factor
-        |> Csg
-
-
-scaleBy : Vector3d Meters c -> Csg c -> Csg c
-scaleBy vector (Csg tree) =
-    tree
-        |> BspTree.scaleBy vector
-        |> Csg
-
-
-withColor : Color -> Csg c -> Csg c
-withColor color (Csg tree) =
-    tree
-        |> BspTree.mapFaces (\f -> { f | color = color })
-        |> Csg
 
 
 
@@ -538,16 +60,16 @@ facesToTriangles ({ normalDirection, color } as face) =
             []
 
 
-toMesh : Csg coordinates -> List (Triangle coordinates)
-toMesh (Csg tree) =
-    tree
+toMesh : Shape3d coordinates -> List (Triangle coordinates)
+toMesh shape =
+    Csg.Shape3d.toTree shape
         |> BspTree.toFaces
         |> List.map facesToTriangles
         |> List.concat
 
 
-toLines : Csg coordinates -> List (LineSegment3d Length.Meters coordinates)
-toLines (Csg tree) =
+toLines : Shape3d coordinates -> List (LineSegment3d Length.Meters coordinates)
+toLines shape =
     let
         centroid : Triangle c -> Point3d Meters c
         centroid ( v1, v2, v3 ) =
@@ -566,12 +88,88 @@ toLines (Csg tree) =
             [ LineSegment3d.from v1.position v2.position
             , LineSegment3d.from v2.position v3.position
             , LineSegment3d.from v3.position v1.position
-            , LineSegment3d.from (centroid ( v1, v2, v3 )) (normalEnd ( v1, v2, v3 ))
+
+            --, LineSegment3d.from (centroid ( v1, v2, v3 )) (normalEnd ( v1, v2, v3 ))
             ]
     in
-    tree
+    Csg.Shape3d.toTree shape
         |> BspTree.toFaces
         |> List.map facesToTriangles
         |> List.concat
         |> List.map triangleSegments
         |> List.concat
+
+
+type alias VertexWithNormal coordinates =
+    { position : Point3d Meters coordinates
+    , normal : Vector3d Unitless coordinates
+    }
+
+
+toTriangularMesh :
+    Shape3d coordinates
+    -> TriangularMesh (VertexWithNormal coordinates)
+toTriangularMesh shape =
+    let
+        toVertex face point =
+            { position = point
+            , normal =
+                Direction3d.toVector face.normalDirection
+                    |> Vector3d.normalize
+            }
+
+        toFan face =
+            NonEmpty.tail face.points
+                |> List.map (toVertex face)
+                |> TriangularMesh.fan (toVertex face (NonEmpty.head face.points))
+    in
+    Csg.Shape3d.toTree shape
+        |> BspTree.toFaces
+        |> List.map toFan
+        |> TriangularMesh.combine
+
+
+toTriangularMeshGroupedByColor :
+    Shape3d coordinates
+    ->
+        List
+            ( TriangularMesh (VertexWithNormal coordinates)
+            , Color
+            )
+toTriangularMeshGroupedByColor shape =
+    let
+        toVertex face point =
+            { position = point
+            , normal =
+                Direction3d.toVector face.normalDirection
+                    |> Vector3d.normalize
+            }
+
+        toColoredMeshMap :
+            Face c
+            -> Dict ( Float, Float, Float ) (List (TriangularMesh (VertexWithNormal c)))
+            -> Dict ( Float, Float, Float ) (List (TriangularMesh (VertexWithNormal c)))
+        toColoredMeshMap face coloredMeshMap =
+            let
+                newMesh =
+                    NonEmpty.tail face.points
+                        |> List.map (toVertex face)
+                        |> TriangularMesh.fan (toVertex face (NonEmpty.head face.points))
+
+                faceColorKey =
+                    Color.toRgba face.color
+                        |> (\{ red, green, blue } -> ( red, green, blue ))
+            in
+            if Dict.member faceColorKey coloredMeshMap then
+                Dict.update faceColorKey
+                    (Maybe.map (\list -> newMesh :: list))
+                    coloredMeshMap
+
+            else
+                Dict.insert faceColorKey [ newMesh ] coloredMeshMap
+    in
+    Csg.Shape3d.toTree shape
+        |> BspTree.toFaces
+        |> List.foldl toColoredMeshMap Dict.empty
+        |> Dict.map (\( r, g, b ) meshes -> ( TriangularMesh.combine meshes, Color.rgb r g b ))
+        |> Dict.values

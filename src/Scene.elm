@@ -8,10 +8,10 @@ import Angle exposing (Angle)
 import Axis3d exposing (Axis3d)
 import Browser
 import Browser.Events
-import BspTree
 import Camera3d
 import Color
 import Csg
+import Csg.Shape3d as CsgShape
 import Direction3d
 import Html
 import Html.Attributes as Attrs
@@ -153,90 +153,74 @@ renderCsg trianglesList =
 
 cube =
     --Csg.sphere (Length.meters 0.7)
-    Csg.cube (Length.meters 1)
-        |> Csg.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
-        |> Csg.withColor Color.red
+    CsgShape.cube (Length.meters 1)
+        |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
+        |> CsgShape.withColor Color.red
 
 
 cube2 =
-    Csg.cube (Length.meters 1)
-        |> Csg.withColor Color.red
-
-
-
-{-
-   split1 =
-       Csg.subtract sphere cube2
--}
--- |> Csg.withColor Color.blue
+    CsgShape.cube (Length.meters 1)
+        |> CsgShape.withColor Color.red
 
 
 cylinderY =
-    Csg.cylinder (Length.centimeters 40) (Point3d.meters 0 -1 0) (Point3d.meters 0 1 0)
-        |> Csg.withColor Color.purple
+    CsgShape.cylinder (Length.centimeters 40) (Point3d.meters 0 -1 0) (Point3d.meters 0 1 0)
+        |> CsgShape.withColor Color.purple
 
 
 cylinderX =
-    Csg.cylinder (Length.centimeters 40) (Point3d.meters -1 0 0) (Point3d.meters 1 0 0)
-        |> Csg.withColor Color.purple
+    CsgShape.cylinder (Length.centimeters 40) (Point3d.meters -1 0 0) (Point3d.meters 1 0 0)
+        |> CsgShape.withColor Color.purple
 
 
 cylinderZ =
-    Csg.cylinder (Length.centimeters 40) (Point3d.meters 0 0 -1) (Point3d.meters 0 0 1)
+    CsgShape.cylinder (Length.centimeters 40) (Point3d.meters 0 0 -1) (Point3d.meters 0 0 1)
 
 
 finalCsg =
     let
         cylinders =
             cylinderX
-                |> Csg.unionWith cylinderY
-                |> Csg.unionWith cylinderZ
-                |> Csg.withColor Color.green
+                |> CsgShape.unionWith cylinderY
+                |> CsgShape.unionWith cylinderZ
+                |> CsgShape.withColor Color.green
     in
     cylinders
-        |> Csg.subtractFrom
+        |> CsgShape.subtractFrom
             (cube
-                |> Csg.intersectWith sphere
+                |> CsgShape.intersectWith sphere
             )
-
-
-
---|> Csg.withColor Color.yellow
 
 
 finalCsg3 =
     let
         cubeBigger =
-            Csg.cube (Length.meters 1)
+            CsgShape.cube (Length.meters 1)
 
         cubeScaled =
             cubeBigger
-                |> Csg.scaleAbout Point3d.origin 0.5
+                |> CsgShape.scaleAbout Point3d.origin 0.5
 
         cubeSmaller =
-            Csg.cube (Length.meters 0.5)
-                |> Csg.translateBy (Vector3d.meters -0.01 -0.01 0.01)
+            CsgShape.cube (Length.meters 0.5)
+                |> CsgShape.translateBy (Vector3d.meters -0.01 -0.01 0.01)
     in
     cubeSmaller
-        |> Csg.subtractFrom cubeBigger
-
-
-
---|> Csg.scaleBy (Vector3d.meters 3 1 0.5)
+        |> CsgShape.subtractFrom cubeBigger
 
 
 finalCsg4 =
-    Csg.cube (Length.meters 1)
-        |> Csg.scaleBy (Vector3d.meters 0.4 1 1)
-        |> Csg.rotateAround Axis3d.y (Angle.degrees -45)
-        |> Csg.translateBy (Vector3d.meters 0 0 0.7)
-        |> Csg.scaleBy (Vector3d.meters 2 1 1)
-        |> Csg.rotateAround Axis3d.y (Angle.degrees 22.5)
-        |> Csg.subtractFrom
-            (Csg.sphere (Length.meters 1)
-                |> Csg.scaleBy (Vector3d.meters 2 1 1)
+    CsgShape.cube (Length.meters 1)
+        |> CsgShape.scaleBy (Vector3d.meters 0.4 1 1)
+        |> CsgShape.rotateAround Axis3d.y (Angle.degrees -45)
+        |> CsgShape.translateBy (Vector3d.meters 0 0 0.7)
+        |> CsgShape.scaleBy (Vector3d.meters 2 1 1)
+        |> CsgShape.rotateAround Axis3d.y (Angle.degrees 22.5)
+        |> CsgShape.subtractFrom
+            (CsgShape.sphere (Length.meters 1)
+                |> CsgShape.scaleBy (Vector3d.meters 2 1 1)
             )
-        |> Csg.scaleBy (Vector3d.meters 0.5 1 1)
+        |> CsgShape.scaleBy (Vector3d.meters 0.5 1 1)
 
 
 finalCsg5 =
@@ -248,8 +232,8 @@ finalCsg5 =
             Length.meters 1
 
         dotAt x y =
-            Csg.sphereWith { slices = 8, stacks = 4 } dotRadius
-                |> Csg.translateBy
+            CsgShape.sphereWith { slices = 8, stacks = 4 } dotRadius
+                |> CsgShape.translateBy
                     (Vector3d.meters
                         (0.3 + (x * 0.2))
                         (0.3 + (y * 0.2))
@@ -260,111 +244,111 @@ finalCsg5 =
             dotAt 1 1
 
         two =
-            Csg.group
+            CsgShape.group
                 [ dotAt 2 2
                 , dotAt 0 0
                 ]
 
         three =
-            Csg.group
+            CsgShape.group
                 [ one
                 , two
                 ]
 
         four =
-            Csg.group
+            CsgShape.group
                 [ dotAt 0 2
                 , dotAt 2 0
                 , two
                 ]
 
         five =
-            Csg.group
+            CsgShape.group
                 [ four
                 , one
                 ]
 
         six =
-            Csg.group
+            CsgShape.group
                 [ four
                 , dotAt 1 2
                 , dotAt 1 0
                 ]
 
         base =
-            Csg.cube cubeSize
-                |> Csg.translateBy (Vector3d.meters -0.5 -0.5 0.5)
-                |> Csg.intersectWith sphere
-                |> Csg.translateBy (Vector3d.meters 0.5 0.5 -0.5)
-                |> Csg.withColor Color.red
+            CsgShape.cube cubeSize
+                |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 0.5)
+                |> CsgShape.intersectWith sphere
+                |> CsgShape.translateBy (Vector3d.meters 0.5 0.5 -0.5)
+                |> CsgShape.withColor Color.red
 
         dots =
-            Csg.group
+            CsgShape.group
                 [ one
-                , six |> Csg.translateBy (Vector3d.meters 0 0 -1)
-                , two |> Csg.rotateAround Axis3d.x (Angle.degrees -90)
+                , six |> CsgShape.translateBy (Vector3d.meters 0 0 -1)
+                , two |> CsgShape.rotateAround Axis3d.x (Angle.degrees -90)
                 , five
-                    |> Csg.rotateAround Axis3d.x (Angle.degrees -90)
-                    |> Csg.translateBy (Vector3d.meters 0 1 0)
+                    |> CsgShape.rotateAround Axis3d.x (Angle.degrees -90)
+                    |> CsgShape.translateBy (Vector3d.meters 0 1 0)
                 , three
-                    |> Csg.rotateAround Axis3d.y (Angle.degrees -90)
-                    |> Csg.rotateAround Axis3d.x (Angle.degrees -90)
+                    |> CsgShape.rotateAround Axis3d.y (Angle.degrees -90)
+                    |> CsgShape.rotateAround Axis3d.x (Angle.degrees -90)
                 , four
-                    |> Csg.rotateAround Axis3d.y (Angle.degrees -90)
-                    |> Csg.rotateAround Axis3d.x (Angle.degrees -90)
-                    |> Csg.translateBy (Vector3d.meters 1 0 0)
+                    |> CsgShape.rotateAround Axis3d.y (Angle.degrees -90)
+                    |> CsgShape.rotateAround Axis3d.x (Angle.degrees -90)
+                    |> CsgShape.translateBy (Vector3d.meters 1 0 0)
                 ]
-                |> Csg.withColor Color.white
+                |> CsgShape.withColor Color.white
     in
     dots
-        |> Csg.subtractFrom base
-        |> Csg.translateBy (Vector3d.meters -0.5 -0.5 0.5)
-        |> Csg.scaleBy (Vector3d.meters 2 1 1)
-        |> Csg.rotateAround Axis3d.x (Angle.degrees -45)
+        |> CsgShape.subtractFrom base
+        |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 0.5)
+        |> CsgShape.scaleBy (Vector3d.meters 2 1 1)
+        |> CsgShape.rotateAround Axis3d.x (Angle.degrees -45)
 
 
 finalCsg7 =
     --|> Csg.scaleBy (Vector3d.meters 1.5 0.5 1)
-    (Csg.cube (Length.meters 1)
-        |> Csg.translateBy (Vector3d.meters -0.5 0 0.5)
+    (CsgShape.cube (Length.meters 1)
+        |> CsgShape.translateBy (Vector3d.meters -0.5 0 0.5)
     )
-        |> Csg.unionWith cube
+        |> CsgShape.unionWith cube
 
 
 finalCsg6 =
     let
         cone =
-            Csg.cone (Length.meters 0.5) (Length.meters 0.5)
+            CsgShape.cone (Length.meters 0.5) (Length.meters 0.5)
 
         twoCones =
-            Csg.group
+            CsgShape.group
                 [ cone
                 , cone
-                    |> Csg.rotateAround Axis3d.x (Angle.degrees 180)
+                    |> CsgShape.rotateAround Axis3d.x (Angle.degrees 180)
                 ]
 
         halfCones =
-            (Csg.cube (Length.meters 1)
-                |> Csg.translateBy (Vector3d.meters -0.5 0 0.5)
+            (CsgShape.cube (Length.meters 1)
+                |> CsgShape.translateBy (Vector3d.meters -0.5 0 0.5)
             )
-                |> Csg.subtractFrom
+                |> CsgShape.subtractFrom
                     twoCones
 
         sphericon =
-            Csg.group
+            CsgShape.group
                 [ halfCones
                 , halfCones
-                    |> Csg.rotateAround Axis3d.z (Angle.degrees 180)
-                    |> Csg.rotateAround Axis3d.y (Angle.degrees 90)
+                    |> CsgShape.rotateAround Axis3d.z (Angle.degrees 180)
+                    |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
                 ]
-                |> Csg.withColor Color.orange
+                |> CsgShape.withColor Color.orange
     in
-    Csg.group
+    CsgShape.group
         [ sphericon
         , sphericon
-            |> Csg.scaleBy (Vector3d.meters 1.2 1 0.5)
-            |> Csg.translateBy (Vector3d.meters 1.2 0 0)
-            |> Csg.withColor Color.green
+            |> CsgShape.scaleBy (Vector3d.meters 1.2 1 0.5)
+            |> CsgShape.translateBy (Vector3d.meters 1.2 0 0)
+            |> CsgShape.withColor Color.green
         ]
 
 
@@ -381,8 +365,8 @@ trianglesCount csg =
 
 
 sphere =
-    Csg.sphere (Length.centimeters 70)
-        |> Csg.withColor Color.blue
+    CsgShape.sphere (Length.centimeters 70)
+        |> CsgShape.withColor Color.blue
 
 
 grid =
@@ -592,17 +576,26 @@ numberToLineSegments num =
         |> List.concat
 
 
-finalCsgLines =
-    finalCsg
-        |> Csg.toLines
-        |> Mesh.lineSegments
-        |> Scene3d.mesh (Material.color Color.black)
-
-
 finalCsgMesh =
     finalCsg
-        |> Csg.toMesh
-        |> renderCsg
+        |> Csg.toTriangularMeshGroupedByColor
+        |> List.map
+            (\( mesh, color ) ->
+                mesh
+                    |> Mesh.indexedFaces
+                    |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0 })
+            )
+        |> Scene3d.group
+--}
+
+
+
+{-
+   , finalCsg
+       |> Csg.toLines
+       |> Mesh.lineSegments
+       |> Scene3d.mesh (Material.color Color.black)
+-}
 
 
 view : Model -> Browser.Document Msg
@@ -635,13 +628,15 @@ view model =
             , Attrs.style "justify-content" "space-between"
             , Attrs.style "align-items" "flex-end"
             ]
-            [ Scene3d.cloudy
+            [ Scene3d.sunny
                 { camera = camera
                 , clipDepth = Length.meters 0.1
                 , dimensions = ( Pixels.int 70, Pixels.int 70 )
                 , background = Scene3d.transparentBackground
                 , entities = [ originCross ]
-                , upDirection = Direction3d.positiveY
+                , upDirection = Direction3d.positiveZ
+                , shadows = True
+                , sunlightDirection = Direction3d.positiveZ
                 }
             , Html.span
                 [ Attrs.style "padding-right" "24px"
@@ -662,10 +657,8 @@ view model =
                      else
                         []
                     )
-                        ++ [ model.mesh
-                           , finalCsgLines
-                           ]
-                , upDirection = Direction3d.positiveY
+                        ++ [ model.mesh ]
+                , upDirection = Direction3d.positiveZ
                 }
             ]
         ]

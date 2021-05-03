@@ -1,11 +1,19 @@
 module Csg.Shape3d exposing
     ( Shape3d
     , cone
+    , coneWith
     , cube
     , cuboid
     , cylinder
+    , cylinderFromTo
     , group
     , intersectWith
+    , moveBackward
+    , moveDown
+    , moveForward
+    , moveLeft
+    , moveRight
+    , moveUp
     , rotateAround
     , scaleAbout
     , scaleBy
@@ -26,14 +34,14 @@ import Direction3d
 import Length exposing (Length, Meters)
 import List.NonEmpty as NonEmpty
 import Point3d exposing (Point3d)
-import Quantity exposing (Unitless)
+import Quantity
 import Triangle3d
 import Vector3d exposing (Vector3d)
 
 
 defaultColor : Color
 defaultColor =
-    Color.gray
+    Color.yellow
 
 
 
@@ -68,38 +76,6 @@ toFace points =
 
         _ ->
             Nothing
-
-
-yzPlane : Shape3d coordinates
-yzPlane =
-    let
-        size =
-            Length.meters 2
-
-        negSize =
-            Length.meters -2
-
-        z =
-            Length.meters 0
-
-        a =
-            Point3d.xyz z negSize negSize
-
-        b =
-            Point3d.xyz z size negSize
-
-        c =
-            Point3d.xyz z size size
-
-        d =
-            Point3d.xyz z negSize size
-
-        rightNormal =
-            Direction3d.x
-    in
-    [ Face ( a, [ b, c, d ] ) rightNormal defaultColor ]
-        |> BspTree.build
-        |> Shape3d
 
 
 cuboid : { width : Length, height : Length, depth : Length } -> Shape3d coordinates
@@ -168,23 +144,25 @@ cube size =
 type alias SphereSettings =
     { slices : Int
     , stacks : Int
+    , radius : Length
     }
 
 
-sphereDefaults : SphereSettings
-sphereDefaults =
+sphereDefaultSettings : SphereSettings
+sphereDefaultSettings =
     { slices = 32
     , stacks = 16
+    , radius = Length.meters 0.5
     }
 
 
 sphere : Length -> Shape3d c
-sphere =
-    sphereWith sphereDefaults
+sphere radius =
+    sphereWith { sphereDefaultSettings | radius = radius }
 
 
-sphereWith : SphereSettings -> Length -> Shape3d c
-sphereWith { slices, stacks } radius =
+sphereWith : SphereSettings -> Shape3d c
+sphereWith { slices, stacks, radius } =
     let
         stacks_ =
             if stacks < 2 then
@@ -271,19 +249,27 @@ sphereWith { slices, stacks } radius =
         |> Shape3d
 
 
-cylinder : Length -> Point3d Meters c -> Point3d Meters c -> Shape3d c
-cylinder radius start end =
-    coneWith
-        { slices = 32 }
-        { bottomRadius = radius
-        , topRadius = radius
-        , bottomPoint = start
-        , topPoint = end
-        }
-
-
 
 -- Cone
+
+
+type alias ConeSettings c =
+    { bottomRadius : Length
+    , bottomPoint : Point3d Meters c
+    , topPoint : Point3d Meters c
+    , topRadius : Length
+    , slices : Int
+    }
+
+
+coneDefaultSettings : ConeSettings c
+coneDefaultSettings =
+    { bottomRadius = Length.meters 0.25
+    , bottomPoint = Point3d.origin
+    , topPoint = Point3d.meters 0 0 1
+    , topRadius = Length.meters 0
+    , slices = 16
+    }
 
 
 cone :
@@ -291,24 +277,17 @@ cone :
     -> Length
     -> Shape3d c
 cone radius height =
-    coneWith { slices = 16 }
-        { bottomRadius = radius
-        , bottomPoint = Point3d.origin
-        , topPoint = Point3d.xyz (Length.meters 0) (Length.meters 0) height
-        , topRadius = Length.meters 0
+    coneWith
+        { coneDefaultSettings
+            | bottomRadius = radius
+            , topPoint = Point3d.xyz (Length.meters 0) (Length.meters 0) height
         }
 
 
 coneWith :
-    { slices : Int }
-    ->
-        { bottomRadius : Length
-        , bottomPoint : Point3d Meters c
-        , topPoint : Point3d Meters c
-        , topRadius : Length
-        }
+    ConeSettings c
     -> Shape3d c
-coneWith { slices } { bottomRadius, bottomPoint, topRadius, topPoint } =
+coneWith { slices, bottomRadius, bottomPoint, topRadius, topPoint } =
     let
         vector =
             Vector3d.from bottomPoint topPoint
@@ -405,6 +384,31 @@ coneWith { slices } { bottomRadius, bottomPoint, topRadius, topPoint } =
 
 
 
+-- Cylinder
+
+
+cylinder : Length -> Length -> Shape3d c
+cylinder radius height =
+    coneWith
+        { coneDefaultSettings
+            | bottomRadius = radius
+            , topRadius = radius
+            , topPoint = Point3d.xyz Quantity.zero Quantity.zero height
+        }
+
+
+cylinderFromTo : Length -> Point3d Meters c -> Point3d Meters c -> Shape3d c
+cylinderFromTo radius start end =
+    coneWith
+        { coneDefaultSettings
+            | bottomRadius = radius
+            , topRadius = radius
+            , bottomPoint = start
+            , topPoint = end
+        }
+
+
+
 -- Operations
 
 
@@ -477,35 +481,77 @@ group csgs =
 
 
 translateBy : Vector3d Meters c -> Shape3d c -> Shape3d c
-translateBy vector (Shape3d tree) =
-    tree
+translateBy vector shape =
+    toTree shape
         |> BspTree.translate vector
         |> Shape3d
 
 
+moveRight : Length -> Shape3d c -> Shape3d c
+moveRight distance shape =
+    toTree shape
+        |> BspTree.translate (Vector3d.xyz distance Quantity.zero Quantity.zero)
+        |> Shape3d
+
+
+moveLeft : Length -> Shape3d c -> Shape3d c
+moveLeft distance shape =
+    toTree shape
+        |> BspTree.translate (Vector3d.xyz (Quantity.negate distance) Quantity.zero Quantity.zero)
+        |> Shape3d
+
+
+moveBackward : Length -> Shape3d c -> Shape3d c
+moveBackward distance shape =
+    toTree shape
+        |> BspTree.translate (Vector3d.xyz Quantity.zero distance Quantity.zero)
+        |> Shape3d
+
+
+moveForward : Length -> Shape3d c -> Shape3d c
+moveForward distance shape =
+    toTree shape
+        |> BspTree.translate (Vector3d.xyz Quantity.zero (Quantity.negate distance) Quantity.zero)
+        |> Shape3d
+
+
+moveUp : Length -> Shape3d c -> Shape3d c
+moveUp distance shape =
+    toTree shape
+        |> BspTree.translate (Vector3d.xyz Quantity.zero Quantity.zero distance)
+        |> Shape3d
+
+
+moveDown : Length -> Shape3d c -> Shape3d c
+moveDown distance shape =
+    toTree shape
+        |> BspTree.translate (Vector3d.xyz Quantity.zero Quantity.zero (Quantity.negate distance))
+        |> Shape3d
+
+
 rotateAround : Axis3d Meters c -> Angle -> Shape3d c -> Shape3d c
-rotateAround axis angle (Shape3d tree) =
-    tree
+rotateAround axis angle shape =
+    toTree shape
         |> BspTree.rotateAround axis angle
         |> Shape3d
 
 
 scaleAbout : Point3d Meters c -> Float -> Shape3d c -> Shape3d c
-scaleAbout origin factor (Shape3d tree) =
-    tree
+scaleAbout origin factor shape =
+    toTree shape
         |> BspTree.scaleAbout origin factor
         |> Shape3d
 
 
 scaleBy : Vector3d Meters c -> Shape3d c -> Shape3d c
-scaleBy vector (Shape3d tree) =
-    tree
+scaleBy vector shape =
+    toTree shape
         |> BspTree.scaleBy vector
         |> Shape3d
 
 
 withColor : Color -> Shape3d c -> Shape3d c
-withColor color (Shape3d tree) =
-    tree
+withColor color shape =
+    toTree shape
         |> BspTree.mapFaces (\f -> { f | color = color })
         |> Shape3d

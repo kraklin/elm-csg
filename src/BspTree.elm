@@ -161,14 +161,9 @@ insert face tree =
                    )
 
 
-fromPoints : Direction3d coordinates -> Color -> List (Point3d Meters coordinates) -> Maybe (Face coordinates)
-fromPoints normalDirection color triangles =
-    case triangles of
-        [] ->
-            Nothing
-
-        first :: rest ->
-            Just { color = color, points = ( first, rest ), normalDirection = normalDirection }
+fromPoints : Direction3d coordinates -> Color -> NonEmpty (Point3d Meters coordinates) -> Face coordinates
+fromPoints normalDirection color points =
+    { color = color, points = points, normalDirection = normalDirection }
 
 
 mapFaces : (Face c -> Face c) -> BspTree c -> BspTree c
@@ -194,10 +189,9 @@ translate : Vector3d Meters c -> BspTree c -> BspTree c
 translate vector tree =
     let
         translateFace f =
-            allPoints f
-                |> List.map (Point3d.translateBy vector)
+            f.points
+                |> NonEmpty.map (Point3d.translateBy vector)
                 |> fromPoints f.normalDirection f.color
-                |> Maybe.withDefault f
     in
     case tree of
         Empty ->
@@ -217,10 +211,9 @@ rotateAround : Axis3d Meters c -> Angle -> BspTree c -> BspTree c
 rotateAround axis angle tree =
     let
         rotateFace f =
-            allPoints f
-                |> List.map (Point3d.rotateAround axis angle)
+            f.points
+                |> NonEmpty.map (Point3d.rotateAround axis angle)
                 |> fromPoints (Direction3d.rotateAround axis angle f.normalDirection) f.color
-                |> Maybe.withDefault f
     in
     case tree of
         Empty ->
@@ -240,10 +233,9 @@ scaleAbout : Point3d Meters c -> Float -> BspTree c -> BspTree c
 scaleAbout origin factor tree =
     let
         scaleFace f =
-            allPoints f
-                |> List.map (Point3d.scaleAbout origin factor)
+            f.points
+                |> NonEmpty.map (Point3d.scaleAbout origin factor)
                 |> fromPoints f.normalDirection f.color
-                |> Maybe.withDefault f
 
         scalePlane p =
             Plane3d.originPoint p
@@ -299,10 +291,9 @@ scaleBy vector tree =
                 |> Maybe.withDefault d
 
         scaleFace f =
-            allPoints f
-                |> List.map scalePoint
+            f.points
+                |> NonEmpty.map scalePoint
                 |> fromPoints (scaleDirection f.normalDirection) f.color
-                |> Maybe.withDefault f
 
         scalePlane p =
             Plane3d.originPoint p

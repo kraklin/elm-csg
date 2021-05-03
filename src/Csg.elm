@@ -1,6 +1,6 @@
 module Csg exposing
-    ( toLines
-    , toMesh
+    ( toLineSegments
+    , toTriangles
     , toTriangularMesh
     , toTriangularMeshGroupedByColor
     )
@@ -23,16 +23,14 @@ import Vector3d exposing (Vector3d)
 -- Rendering to Mesh or Wireframe
 
 
+type alias Vertex coordinates =
+    { position : Point3d Meters coordinates
+    , normal : Vector3d Unitless coordinates
+    }
+
+
 type alias Triangle c =
-    ( Vertex c
-    , Vertex c
-    , Vertex c
-    )
-
-
-type alias Vertex c =
-    { position : Point3d Length.Meters c
-    , normal : Vector3d Unitless c
+    { vertices : ( Vertex c, Vertex c, Vertex c )
     , color : Color
     }
 
@@ -41,9 +39,9 @@ facesToTriangles : Face coordinates -> List (Triangle coordinates)
 facesToTriangles ({ normalDirection, color } as face) =
     let
         withNormal ( v1, v2, v3 ) =
-            ( { position = v1, normal = Direction3d.toVector normalDirection, color = color }
-            , { position = v2, normal = Direction3d.toVector normalDirection, color = color }
-            , { position = v3, normal = Direction3d.toVector normalDirection, color = color }
+            ( { position = v1, normal = Direction3d.toVector normalDirection }
+            , { position = v2, normal = Direction3d.toVector normalDirection }
+            , { position = v3, normal = Direction3d.toVector normalDirection }
             )
     in
     case BspTree.allPoints face of
@@ -51,7 +49,7 @@ facesToTriangles ({ normalDirection, color } as face) =
             rest
                 |> List.foldl
                     (\pNext { pPrevious, triangles } ->
-                        { pPrevious = pNext, triangles = withNormal ( p1, pPrevious, pNext ) :: triangles }
+                        { pPrevious = pNext, triangles = { vertices = withNormal ( p1, pPrevious, pNext ), color = color } :: triangles }
                     )
                     { pPrevious = p2, triangles = [] }
                 |> .triangles
@@ -60,55 +58,56 @@ facesToTriangles ({ normalDirection, color } as face) =
             []
 
 
-toMesh : Shape3d coordinates -> List (Triangle coordinates)
-toMesh shape =
+toTriangles : Shape3d coordinates -> List (Triangle coordinates)
+toTriangles shape =
     Csg.Shape3d.toTree shape
         |> BspTree.toFaces
         |> List.map facesToTriangles
         |> List.concat
 
 
-toLines : Shape3d coordinates -> List (LineSegment3d Length.Meters coordinates)
-toLines shape =
+toLineSegments : Shape3d coordinates -> List (LineSegment3d Meters coordinates)
+toLineSegments =
+    toLinesAndNormals False
+
+
+toLinesAndNormals : Bool -> Shape3d coordinates -> List (LineSegment3d Length.Meters coordinates)
+toLinesAndNormals withNormals shape =
     let
-        centroid : Triangle c -> Point3d Meters c
+        centroid : ( Vertex c, Vertex c, Vertex c ) -> Point3d Meters c
         centroid ( v1, v2, v3 ) =
             Point3d.centroid3 v1.position v2.position v3.position
 
-        normalEnd : Triangle c -> Point3d Meters c
-        normalEnd ( v1, v2, v3 ) =
+        normalEnd : ( Vertex c, Vertex c, Vertex c ) -> Point3d Meters c
+        normalEnd (( v1, _, _ ) as vertices) =
             Point3d.translateBy
                 (Vector3d.toUnitless v1.normal
                     |> Vector3d.fromMeters
                     |> Vector3d.scaleBy 0.2
                 )
-                (centroid ( v1, v2, v3 ))
+                (centroid vertices)
 
         triangleSegments ( v1, v2, v3 ) =
             [ LineSegment3d.from v1.position v2.position
             , LineSegment3d.from v2.position v3.position
             , LineSegment3d.from v3.position v1.position
-
-            --, LineSegment3d.from (centroid ( v1, v2, v3 )) (normalEnd ( v1, v2, v3 ))
             ]
+                ++ (if withNormals then
+                        [ LineSegment3d.from (centroid ( v1, v2, v3 )) (normalEnd ( v1, v2, v3 )) ]
+
+                    else
+                        []
+                   )
     in
     Csg.Shape3d.toTree shape
         |> BspTree.toFaces
         |> List.map facesToTriangles
         |> List.concat
-        |> List.map triangleSegments
+        |> List.map (.vertices >> triangleSegments)
         |> List.concat
 
 
-type alias VertexWithNormal coordinates =
-    { position : Point3d Meters coordinates
-    , normal : Vector3d Unitless coordinates
-    }
-
-
-toTriangularMesh :
-    Shape3d coordinates
-    -> TriangularMesh (VertexWithNormal coordinates)
+toTriangularMesh : Shape3d coordinates -> TriangularMesh (Vertex coordinates)
 toTriangularMesh shape =
     let
         toVertex face point =
@@ -129,13 +128,7 @@ toTriangularMesh shape =
         |> TriangularMesh.combine
 
 
-toTriangularMeshGroupedByColor :
-    Shape3d coordinates
-    ->
-        List
-            ( TriangularMesh (VertexWithNormal coordinates)
-            , Color
-            )
+toTriangularMeshGroupedByColor : Shape3d coordinates -> List ( TriangularMesh (Vertex coordinates), Color )
 toTriangularMeshGroupedByColor shape =
     let
         toVertex face point =
@@ -147,8 +140,8 @@ toTriangularMeshGroupedByColor shape =
 
         toColoredMeshMap :
             Face c
-            -> Dict ( Float, Float, Float ) (List (TriangularMesh (VertexWithNormal c)))
-            -> Dict ( Float, Float, Float ) (List (TriangularMesh (VertexWithNormal c)))
+            -> Dict ( Float, Float, Float ) (List (TriangularMesh (Vertex c)))
+            -> Dict ( Float, Float, Float ) (List (TriangularMesh (Vertex c)))
         toColoredMeshMap face coloredMeshMap =
             let
                 newMesh =

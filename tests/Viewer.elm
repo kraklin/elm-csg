@@ -1,4 +1,4 @@
-module Scene exposing (main)
+module Viewer exposing (main)
 
 {-| This example shows how you can allow orbiting of a scene by listening for
 mouse events and moving the camera accordingly.
@@ -19,6 +19,7 @@ import Html.Events as Events
 import Json.Decode as Decode exposing (Decoder)
 import Length exposing (Meters)
 import LineSegment3d exposing (LineSegment3d)
+import Models
 import Pixels exposing (Pixels)
 import Plane3d
 import Point3d
@@ -31,6 +32,10 @@ import Vector3d
 import Viewpoint3d
 
 
+meshToShow =
+    Models.sphericon
+
+
 type WorldCoordinates
     = WorldCoordinates
 
@@ -41,6 +46,7 @@ type alias Model =
     , orbiting : Bool -- Whether the mouse button is currently down
     , clipPlanePosition : Float
     , mesh : Scene3d.Entity WorldCoordinates
+    , trianglesCount : Int
     , showAxis : Bool
     }
 
@@ -49,7 +55,7 @@ type Msg
     = MouseDown
     | MouseUp
     | MouseMove (Quantity Float Pixels) (Quantity Float Pixels)
-    | PlanePositionChanged String
+    | MeshSelected String
 
 
 init : () -> ( Model, Cmd Msg )
@@ -61,19 +67,29 @@ init () =
       , orbiting = False
       , clipPlanePosition = -0.5
       , mesh =
-            allShapes
-                |> Csg.toTriangularMeshGroupedByColor
-                |> List.map
-                    (\( mesh, color ) ->
-                        mesh
-                            |> Mesh.indexedFaces
-                            |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0 })
-                    )
-                |> Scene3d.group
+            meshToShow
+                |> toSceneEntity
       , showAxis = True
+      , trianglesCount =
+            meshToShow
+                |> Csg.toTriangles
+                |> List.length
       }
     , Cmd.none
     )
+
+
+toSceneEntity : CsgShape.Shape3d WorldCoordinates -> Scene3d.Entity WorldCoordinates
+toSceneEntity csg =
+    csg
+        |> Csg.toTriangularMeshGroupedByColor
+        |> List.map
+            (\( mesh, color ) ->
+                mesh
+                    |> Mesh.indexedFaces
+                    |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0 })
+            )
+        |> Scene3d.group
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -118,8 +134,26 @@ update message model =
             else
                 ( model, Cmd.none )
 
-        PlanePositionChanged input ->
-            ( { model | clipPlanePosition = String.toFloat input |> Maybe.withDefault 0 }, Cmd.none )
+        MeshSelected meshName ->
+            let
+                mesh =
+                    case meshName of
+                        "allShapes" ->
+                            Models.allShapes
+
+                        "dice" ->
+                            Models.dice
+
+                        "sphericon" ->
+                            Models.sphericon
+
+                        "tCube" ->
+                            Models.transformationsCube
+
+                        _ ->
+                            Models.allShapes
+            in
+            ( { model | mesh = toSceneEntity mesh }, Cmd.none )
 
 
 {-| Use movementX and movementY for simplicity (don't need to store initial
@@ -150,270 +184,8 @@ subscriptions model =
         Browser.Events.onMouseDown (Decode.succeed MouseDown)
 
 
-renderCsg trianglesList =
-    trianglesList
-        |> List.map
-            (\( v1, v2, v3 ) ->
-                Triangle3d.from v1.position v2.position v3.position
-                    |> Scene3d.facet (Material.matte v1.color)
-            )
-        |> Scene3d.group
-
-
-cube =
-    --Csg.sphere (Length.meters 0.7)
-    CsgShape.cube (Length.meters 1)
-        |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
-        |> CsgShape.withColor Color.red
-
-
-cube2 =
-    CsgShape.cube (Length.meters 1)
-        |> CsgShape.withColor Color.red
-
-
-cylinderY =
-    CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters 0 -1 0) (Point3d.meters 0 1 0)
-        |> CsgShape.withColor Color.purple
-
-
-cylinderX =
-    CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters -1 0 0) (Point3d.meters 1 0 0)
-        |> CsgShape.withColor Color.purple
-
-
-cylinderZ =
-    CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters 0 0 -1) (Point3d.meters 0 0 1)
-
-
-finalCsg =
-    let
-        cylinders =
-            cylinderX
-                |> CsgShape.unionWith cylinderY
-                |> CsgShape.unionWith cylinderZ
-                |> CsgShape.withColor Color.green
-    in
-    cylinders
-        |> CsgShape.subtractFrom
-            (cube
-                |> CsgShape.intersectWith sphere
-            )
-
-
-allShapes =
-    let
-        smallCube =
-            CsgShape.cube (Length.centimeters 10)
-                |> CsgShape.withColor Color.red
-
-        cuboid =
-            CsgShape.cuboid
-                { width = Length.centimeters 10
-                , depth = Length.centimeters 20
-                , height = Length.centimeters 30
-                }
-                |> CsgShape.withColor Color.blue
-
-        cone =
-            CsgShape.cone (Length.centimeters 5) (Length.centimeters 20)
-                |> CsgShape.withColor Color.yellow
-
-        coneWith =
-            CsgShape.coneWith
-                { slices = 6
-                , bottomRadius = Length.centimeters 7
-                , topRadius = Length.centimeters 3
-                , bottomPoint = Point3d.origin
-                , topPoint = Point3d.xyz Quantity.zero Quantity.zero (Length.centimeters 20)
-                }
-                |> CsgShape.withColor Color.darkGreen
-
-        cylinder =
-            CsgShape.cylinder (Length.centimeters 5) (Length.centimeters 20)
-                |> CsgShape.withColor Color.green
-
-        smallSphere =
-            CsgShape.sphere (Length.centimeters 5)
-                |> CsgShape.withColor Color.purple
-    in
-    CsgShape.group
-        [ smallCube
-        , cuboid |> CsgShape.moveBackward (Length.centimeters 15)
-        , cone
-            |> CsgShape.moveRight (Length.centimeters 20)
-            |> CsgShape.moveBackward (Length.centimeters 5)
-        , cylinder
-            |> CsgShape.moveRight (Length.centimeters 20)
-            |> CsgShape.moveBackward (Length.centimeters 25)
-        , coneWith
-            |> CsgShape.moveRight (Length.centimeters 20)
-            |> CsgShape.moveBackward (Length.centimeters 47)
-        , smallSphere
-            |> CsgShape.moveLeft (Length.centimeters 10)
-            |> CsgShape.moveBackward (Length.centimeters 5)
-            |> CsgShape.moveUp (Length.centimeters 5)
-        ]
-
-
-finalCsg4 =
-    CsgShape.cube (Length.meters 1)
-        |> CsgShape.scaleBy (Vector3d.meters 0.4 1 1)
-        |> CsgShape.rotateAround Axis3d.y (Angle.degrees -45)
-        |> CsgShape.translateBy (Vector3d.meters 0 0 0.7)
-        |> CsgShape.scaleBy (Vector3d.meters 2 1 1)
-        |> CsgShape.rotateAround Axis3d.y (Angle.degrees 22.5)
-        |> CsgShape.subtractFrom
-            (CsgShape.sphere (Length.meters 1)
-                |> CsgShape.scaleBy (Vector3d.meters 2 1 1)
-            )
-        |> CsgShape.scaleBy (Vector3d.meters 0.5 1 1)
-
-
-finalCsg5 =
-    let
-        dotRadius =
-            Length.centimeters 8
-
-        cubeSize =
-            Length.meters 1
-
-        dotAt x y =
-            CsgShape.sphereWith { slices = 8, stacks = 4, radius = dotRadius }
-                |> CsgShape.translateBy
-                    (Vector3d.meters
-                        (0.3 + (x * 0.2))
-                        (0.3 + (y * 0.2))
-                        0
-                    )
-
-        one =
-            dotAt 1 1
-
-        two =
-            CsgShape.group
-                [ dotAt 2 2
-                , dotAt 0 0
-                ]
-
-        three =
-            CsgShape.group
-                [ one
-                , two
-                ]
-
-        four =
-            CsgShape.group
-                [ dotAt 0 2
-                , dotAt 2 0
-                , two
-                ]
-
-        five =
-            CsgShape.group
-                [ four
-                , one
-                ]
-
-        six =
-            CsgShape.group
-                [ four
-                , dotAt 1 2
-                , dotAt 1 0
-                ]
-
-        base =
-            CsgShape.cube cubeSize
-                |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 0.5)
-                |> CsgShape.intersectWith sphere
-                |> CsgShape.translateBy (Vector3d.meters 0.5 0.5 -0.5)
-                |> CsgShape.withColor Color.red
-
-        dots =
-            CsgShape.group
-                [ one
-                , six |> CsgShape.translateBy (Vector3d.meters 0 0 -1)
-                , two |> CsgShape.rotateAround Axis3d.x (Angle.degrees -90)
-                , five
-                    |> CsgShape.rotateAround Axis3d.x (Angle.degrees -90)
-                    |> CsgShape.translateBy (Vector3d.meters 0 1 0)
-                , three
-                    |> CsgShape.rotateAround Axis3d.y (Angle.degrees -90)
-                    |> CsgShape.rotateAround Axis3d.x (Angle.degrees -90)
-                , four
-                    |> CsgShape.rotateAround Axis3d.y (Angle.degrees -90)
-                    |> CsgShape.rotateAround Axis3d.x (Angle.degrees -90)
-                    |> CsgShape.translateBy (Vector3d.meters 1 0 0)
-                ]
-                |> CsgShape.withColor Color.white
-    in
-    dots
-        |> CsgShape.subtractFrom base
-        |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 0.5)
-        |> CsgShape.scaleBy (Vector3d.meters 2 1 1)
-        |> CsgShape.rotateAround Axis3d.x (Angle.degrees -45)
-
-
-finalCsg7 =
-    --|> Csg.scaleBy (Vector3d.meters 1.5 0.5 1)
-    (CsgShape.cube (Length.meters 1)
-        |> CsgShape.translateBy (Vector3d.meters -0.5 0 0.5)
-    )
-        |> CsgShape.unionWith cube
-
-
-finalCsg6 =
-    let
-        cone =
-            CsgShape.cone (Length.meters 0.5) (Length.meters 0.5)
-
-        twoCones =
-            CsgShape.group
-                [ cone
-                , cone
-                    |> CsgShape.rotateAround Axis3d.x (Angle.degrees 180)
-                ]
-
-        halfCones =
-            (CsgShape.cube (Length.meters 1)
-                |> CsgShape.translateBy (Vector3d.meters -0.5 0 0.5)
-            )
-                |> CsgShape.subtractFrom
-                    twoCones
-
-        sphericon =
-            CsgShape.group
-                [ halfCones
-                , halfCones
-                    |> CsgShape.rotateAround Axis3d.z (Angle.degrees 180)
-                    |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
-                ]
-                |> CsgShape.withColor Color.orange
-    in
-    CsgShape.group
-        [ sphericon
-        , sphericon
-            |> CsgShape.scaleBy (Vector3d.meters 1.2 1 0.5)
-            |> CsgShape.translateBy (Vector3d.meters 1.2 0 0)
-            |> CsgShape.withColor Color.green
-        ]
-
-
-
-{-
-   |> Csg.toLines
-   |> Mesh.lineSegments
-   |> Scene3d.mesh (Material.color Color.green)
--}
-
-
 trianglesCount csg =
     csg |> Csg.toTriangles |> List.length
-
-
-sphere =
-    CsgShape.sphere (Length.centimeters 70)
-        |> CsgShape.withColor Color.blue
 
 
 grid =
@@ -623,26 +395,26 @@ numberToLineSegments num =
         |> List.concat
 
 
-finalCsgMesh =
-    finalCsg
-        |> Csg.toTriangularMeshGroupedByColor
-        |> List.map
-            (\( mesh, color ) ->
-                mesh
-                    |> Mesh.indexedFaces
-                    |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0 })
-            )
-        |> Scene3d.group
---}
+originCross =
+    let
+        radius =
+            Pixels.pixels 4
 
-
-
-{-
-   , finalCsg
-       |> Csg.toLines
-       |> Mesh.lineSegments
-       |> Scene3d.mesh (Material.color Color.black)
--}
+        distance =
+            1
+    in
+    Scene3d.group
+        [ Scene3d.point { radius = radius } (Material.color Color.black) Point3d.origin
+        , Scene3d.point { radius = radius } (Material.color Color.red) (Point3d.meters distance 0 0)
+        , Scene3d.point { radius = radius } (Material.color Color.green) (Point3d.meters 0 distance 0)
+        , Scene3d.point { radius = radius } (Material.color Color.blue) (Point3d.meters 0 0 distance)
+        , LineSegment3d.along Axis3d.x (Length.meters 0) (Length.meters distance)
+            |> Scene3d.lineSegment (Material.color Color.red)
+        , LineSegment3d.along Axis3d.y (Length.meters 0) (Length.meters distance)
+            |> Scene3d.lineSegment (Material.color Color.green)
+        , LineSegment3d.along Axis3d.z (Length.meters 0) (Length.meters distance)
+            |> Scene3d.lineSegment (Material.color Color.blue)
+        ]
 
 
 view : Model -> Browser.Document Msg
@@ -670,7 +442,7 @@ view model =
                 { focalPoint = Point3d.meters 0 0 0
                 , azimuth = model.azimuth
                 , elevation = model.elevation
-                , distance = Length.meters 2
+                , distance = Length.meters 7
                 }
 
         cameraMesh =
@@ -678,6 +450,10 @@ view model =
                 { viewpoint = viewpointMesh
                 , verticalFieldOfView = Angle.degrees 30
                 }
+
+        meshSelectDecoder : Decoder String
+        meshSelectDecoder =
+            Decode.at [ "target", "value" ] Decode.string
     in
     { title = "Elm CSG"
     , body =
@@ -703,7 +479,16 @@ view model =
                 [ Attrs.style "padding-right" "24px"
                 , Attrs.style "user-select" "none"
                 ]
-                [ Html.text <| "tri count: " ++ (String.fromInt <| trianglesCount allShapes) ]
+                [ Html.text <| "tri count: " ++ String.fromInt model.trianglesCount ]
+            ]
+        , Html.div
+            [ Attrs.style "position" "absolute" ]
+            [ Html.select [ Attrs.id "select", Events.on "change" <| Decode.map MeshSelected meshSelectDecoder ]
+                [ Html.option [ Attrs.value "allShapes" ] [ Html.text "All shapes" ]
+                , Html.option [ Attrs.value "sphericon" ] [ Html.text "Sphericon" ]
+                , Html.option [ Attrs.value "dice" ] [ Html.text "Dice" ]
+                , Html.option [ Attrs.value "tCube" ] [ Html.text "Transformations cube" ]
+                ]
             ]
         , Html.div [ Attrs.style "background-color" "rgba(255, 255, 0, 0.2)" ]
             [ Scene3d.cloudy
@@ -724,28 +509,6 @@ view model =
             ]
         ]
     }
-
-
-originCross =
-    let
-        radius =
-            Pixels.pixels 4
-
-        distance =
-            1
-    in
-    Scene3d.group
-        [ Scene3d.point { radius = radius } (Material.color Color.black) Point3d.origin
-        , Scene3d.point { radius = radius } (Material.color Color.red) (Point3d.meters distance 0 0)
-        , Scene3d.point { radius = radius } (Material.color Color.green) (Point3d.meters 0 distance 0)
-        , Scene3d.point { radius = radius } (Material.color Color.blue) (Point3d.meters 0 0 distance)
-        , LineSegment3d.along Axis3d.x (Length.meters 0) (Length.meters distance)
-            |> Scene3d.lineSegment (Material.color Color.red)
-        , LineSegment3d.along Axis3d.y (Length.meters 0) (Length.meters distance)
-            |> Scene3d.lineSegment (Material.color Color.green)
-        , LineSegment3d.along Axis3d.z (Length.meters 0) (Length.meters distance)
-            |> Scene3d.lineSegment (Material.color Color.blue)
-        ]
 
 
 main : Program () Model Msg

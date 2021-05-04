@@ -21,6 +21,7 @@ module Csg.Shape3d exposing
     , sphereWith
     , subtractFrom
     , toTree
+    , torus
     , translateBy
     , unionWith
     , withColor
@@ -409,6 +410,71 @@ cylinderFromTo radius start end =
 
 
 
+-- Torus
+
+
+torus : Length -> Length -> Shape3d c
+torus innerRadius outerRadius =
+    let
+        stacks_ =
+            8
+
+        slices_ =
+            16
+
+        deltaOuter =
+            Angle.turns (1 / toFloat stacks_)
+
+        deltaInner =
+            Angle.turns (1 / toFloat slices_)
+
+        firstCircle =
+            List.range 0 stacks_
+                |> List.map
+                    (\stackId ->
+                        Point3d.xyz (Length.meters 0) innerRadius (Length.meters 0)
+                            |> Point3d.rotateAround Axis3d.x (Quantity.multiplyBy (toFloat stackId) deltaOuter)
+                            |> Point3d.translateBy (Vector3d.xyz (Length.meters 0) (Quantity.minus innerRadius outerRadius) (Length.meters 0))
+                    )
+
+        allCircles =
+            List.range 0 (slices_ - 1)
+                |> List.map
+                    (\innerIdx ->
+                        let
+                            firstCirclePoints =
+                                firstCircle
+                                    |> List.map
+                                        (Point3d.rotateAround Axis3d.z (Quantity.multiplyBy (toFloat (innerIdx - 1)) deltaInner))
+
+                            secondCirclePoints =
+                                firstCircle
+                                    |> List.map (Point3d.rotateAround Axis3d.z (Quantity.multiplyBy (toFloat innerIdx) deltaInner))
+                        in
+                        List.map2 (\fli sli -> ( fli, sli ))
+                            firstCirclePoints
+                            secondCirclePoints
+                            |> List.foldl
+                                (\( p3, p4 ) { previous, faces } ->
+                                    case previous of
+                                        Nothing ->
+                                            { previous = Just ( p3, p4 ), faces = faces }
+
+                                        Just ( p1, p2 ) ->
+                                            { previous = Just ( p3, p4 ), faces = toFace [ p1, p2, p4, p3 ] :: faces }
+                                )
+                                { previous = Nothing, faces = [] }
+                            |> .faces
+                            |> List.filterMap identity
+                    )
+    in
+    allCircles
+        |> List.concat
+        |> BspTree.build
+        |> Shape3d
+
+
+
 -- Operations
 
 
@@ -466,6 +532,7 @@ subtractFrom (Shape3d t1) (Shape3d t2) =
                 |> BspTree.toFaces
                 |> List.map (BspTree.findInside BspTree.None t1)
                 |> List.concat
+                |> BspTree.invertFaces
     in
     (a ++ b)
         |> BspTree.build

@@ -1,4 +1,11 @@
-module Models exposing (allShapes, dice, sphericon, transformationsCube)
+module Models exposing
+    ( allShapes
+    , dice
+    , simpleTransformations
+    , sphericon
+    , torus
+    , transformationsCube
+    )
 
 import Angle exposing (Angle)
 import Axis3d exposing (Axis3d)
@@ -128,7 +135,7 @@ dice =
             CsgShape.cube cubeSize
                 |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
                 |> CsgShape.intersectWith sphere
-                |> CsgShape.withColor Color.red
+                |> CsgShape.withColor Color.green
 
         dots =
             CsgShape.group
@@ -214,3 +221,41 @@ transformationsCube =
             (cube
                 |> CsgShape.intersectWith sphere
             )
+
+
+torus =
+    let
+        visor =
+            CsgShape.cuboid { width = Length.centimeters 5, height = Length.centimeters 50, depth = Length.centimeters 5 }
+                |> CsgShape.moveLeft (Length.centimeters 2.5)
+                |> CsgShape.unionWith
+                    (CsgShape.cuboid { width = Length.centimeters 5, height = Length.centimeters 50, depth = Length.centimeters 5 }
+                        |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
+                        |> CsgShape.moveLeft (Length.centimeters 25)
+                        |> CsgShape.moveUp (Length.centimeters 50)
+                    )
+                |> CsgShape.withColor Color.gray
+
+        bust =
+            CsgShape.torus (Length.centimeters 20) (Length.centimeters 60)
+                |> CsgShape.withColor Color.white
+                |> CsgShape.scaleBy (Vector3d.meters 1 1 0.8)
+                |> CsgShape.rotateAround Axis3d.y (Angle.degrees 20)
+                |> CsgShape.moveUp (Length.centimeters 25)
+                |> CsgShape.subtractFrom
+                    (CsgShape.cylinder (Length.centimeters 40) (Length.centimeters 80)
+                        |> CsgShape.withColor Color.black
+                    )
+    in
+    visor
+        |> CsgShape.moveForward (Length.centimeters 40)
+        |> CsgShape.moveUp (Length.centimeters 20)
+        |> CsgShape.rotateAround Axis3d.z (Angle.degrees 90)
+        |> CsgShape.subtractFrom bust
+
+
+simpleTransformations =
+    CsgShape.cube (Length.meters 1)
+        |> CsgShape.moveLeft (Length.meters 0.5)
+        |> CsgShape.intersectWith
+            (CsgShape.cube (Length.meters 1))

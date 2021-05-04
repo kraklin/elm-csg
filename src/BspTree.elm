@@ -1,4 +1,20 @@
-module BspTree exposing (..)
+module BspTree exposing
+    ( BspTree
+    , Face
+    , Orientation(..)
+    , allPoints
+    , build
+    , empty
+    , findInside
+    , findOutside
+    , invertFaces
+    , mapFaces
+    , rotateAround
+    , scaleAbout
+    , scaleBy
+    , toFaces
+    , translate
+    )
 
 import Angle exposing (Angle)
 import Axis3d exposing (Axis3d)
@@ -437,6 +453,19 @@ findOutside orientation tree face =
                 |> (\{ inside, outside } ->
                         handleInside inside nodeData.inside ++ handleOutside outside nodeData.outside
                    )
+
+
+invertFaces : List (Face c) -> List (Face c)
+invertFaces =
+    let
+        invertFace : Face c -> Face c
+        invertFace f =
+            { f
+                | points = NonEmpty.reverse f.points
+                , normalDirection = Direction3d.reverse f.normalDirection
+            }
+    in
+    List.map invertFace
 
 
 dedup : List (Point3d Meters c) -> List (Point3d Meters c)

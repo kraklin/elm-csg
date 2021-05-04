@@ -1,5 +1,6 @@
 module Csg exposing
     ( toLineSegments
+    , toLinesAndNormals
     , toTriangles
     , toTriangularMesh
     , toTriangularMeshGroupedByColor

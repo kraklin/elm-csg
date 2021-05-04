@@ -33,7 +33,7 @@ import Viewpoint3d
 
 
 meshToShow =
-    Models.sphericon
+    Models.torus
 
 
 type WorldCoordinates
@@ -67,8 +67,10 @@ init () =
       , orbiting = False
       , clipPlanePosition = -0.5
       , mesh =
-            meshToShow
+            Models.torus
                 |> toSceneEntity
+
+      --|> toWireframe
       , showAxis = True
       , trianglesCount =
             meshToShow
@@ -88,6 +90,18 @@ toSceneEntity csg =
                 mesh
                     |> Mesh.indexedFaces
                     |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0 })
+            )
+        |> Scene3d.group
+
+
+toWireframe : CsgShape.Shape3d WorldCoordinates -> Scene3d.Entity WorldCoordinates
+toWireframe csg =
+    csg
+        |> Csg.toLinesAndNormals True
+        |> List.map
+            (\lineSegment ->
+                lineSegment
+                    |> Scene3d.lineSegment (Material.color Color.black)
             )
         |> Scene3d.group
 
@@ -153,7 +167,7 @@ update message model =
                         _ ->
                             Models.allShapes
             in
-            ( { model | mesh = toSceneEntity mesh }, Cmd.none )
+            ( { model | mesh = mesh |> toWireframe }, Cmd.none )
 
 
 {-| Use movementX and movementY for simplicity (don't need to store initial

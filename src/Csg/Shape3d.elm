@@ -20,7 +20,7 @@ module Csg.Shape3d exposing
     , sphere
     , sphereWith
     , subtractFrom
-    , toTree
+    , toFaces
     , torus
     , translateBy
     , unionWith
@@ -51,6 +51,11 @@ defaultColor =
 
 type Shape3d c
     = Shape3d (BspTree c)
+
+
+toFaces : Shape3d c -> List (Face c)
+toFaces (Shape3d tree) =
+    BspTree.toFaces tree
 
 
 toTree : Shape3d c -> BspTree c

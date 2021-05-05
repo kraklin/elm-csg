@@ -61,8 +61,7 @@ facesToTriangles ({ normalDirection, color } as face) =
 
 toTriangles : Shape3d coordinates -> List (Triangle coordinates)
 toTriangles shape =
-    Csg.Shape3d.toTree shape
-        |> BspTree.toFaces
+    Csg.Shape3d.toFaces shape
         |> List.map facesToTriangles
         |> List.concat
 
@@ -100,8 +99,7 @@ toLinesAndNormals withNormals shape =
                         []
                    )
     in
-    Csg.Shape3d.toTree shape
-        |> BspTree.toFaces
+    Csg.Shape3d.toFaces shape
         |> List.map facesToTriangles
         |> List.concat
         |> List.map (.vertices >> triangleSegments)
@@ -123,8 +121,7 @@ toTriangularMesh shape =
                 |> List.map (toVertex face)
                 |> TriangularMesh.fan (toVertex face (NonEmpty.head face.points))
     in
-    Csg.Shape3d.toTree shape
-        |> BspTree.toFaces
+    Csg.Shape3d.toFaces shape
         |> List.map toFan
         |> TriangularMesh.combine
 
@@ -162,8 +159,7 @@ toTriangularMeshGroupedByColor shape =
             else
                 Dict.insert faceColorKey [ newMesh ] coloredMeshMap
     in
-    Csg.Shape3d.toTree shape
-        |> BspTree.toFaces
+    Csg.Shape3d.toFaces shape
         |> List.foldl toColoredMeshMap Dict.empty
         |> Dict.map (\( r, g, b ) meshes -> ( TriangularMesh.combine meshes, Color.rgb r g b ))
         |> Dict.values

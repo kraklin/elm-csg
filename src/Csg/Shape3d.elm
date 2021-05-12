@@ -31,7 +31,6 @@ import Angle exposing (Angle)
 import Axis3d exposing (Axis3d)
 import BspTree exposing (BspTree, Face)
 import Color exposing (Color)
-import Direction3d
 import Length exposing (Length, Meters)
 import List.NonEmpty as NonEmpty
 import Point3d exposing (Point3d)
@@ -165,6 +164,10 @@ sphereDefaultSettings =
 sphere : Length -> Shape3d c
 sphere radius =
     sphereWith { sphereDefaultSettings | radius = radius }
+
+
+
+-- TODO - orientation of top should be Z axis, not Y
 
 
 sphereWith : SphereSettings -> Shape3d c
@@ -422,7 +425,7 @@ torus : Length -> Length -> Shape3d c
 torus innerRadius outerRadius =
     let
         stacks_ =
-            8
+            16
 
         slices_ =
             16
@@ -544,6 +547,9 @@ subtractFrom (Shape3d t1) (Shape3d t2) =
         |> Shape3d
 
 
+{-| TODO: bottleneck for combining lots of complicated models
+-- may I create the group somehow differently than chain unionWith?
+-}
 group : List (Shape3d c) -> Shape3d c
 group csgs =
     csgs
@@ -613,6 +619,10 @@ scaleAbout origin factor shape =
     toTree shape
         |> BspTree.scaleAbout origin factor
         |> Shape3d
+
+
+
+-- TODO: needs to be unitless
 
 
 scaleBy : Vector3d Meters c -> Shape3d c -> Shape3d c

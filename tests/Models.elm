@@ -1,6 +1,8 @@
 module Models exposing
     ( allShapes
     , dice
+    , eightPawns
+    , pawn
     , simpleTransformations
     , sphericon
     , torus
@@ -259,3 +261,67 @@ simpleTransformations =
         |> CsgShape.moveLeft (Length.meters 0.5)
         |> CsgShape.intersectWith
             (CsgShape.cube (Length.meters 1))
+
+
+pawn =
+    let
+        base =
+            CsgShape.cone (Length.centimeters 19) (Length.centimeters 20)
+                |> CsgShape.unionWith
+                    (CsgShape.torus (Length.centimeters 6) (Length.centimeters 19)
+                        |> CsgShape.moveUp (Length.centimeters 6)
+                    )
+                |> CsgShape.unionWith
+                    (CsgShape.cylinder (Length.centimeters 15) (Length.centimeters 8)
+                        |> CsgShape.moveUp (Length.centimeters 4)
+                    )
+                |> CsgShape.withColor Color.yellow
+
+        top =
+            CsgShape.torus (Length.centimeters 12) (Length.centimeters 29)
+                |> CsgShape.moveUp (Length.centimeters 12)
+                |> CsgShape.subtractFrom
+                    (CsgShape.cylinder (Length.centimeters 15) (Length.centimeters 20))
+                |> CsgShape.unionWith
+                    (CsgShape.sphereWith
+                        { radius =
+                            Length.centimeters 8.4
+                        , stacks = 8
+                        , slices = 16
+                        }
+                        |> CsgShape.rotateAround Axis3d.x (Angle.degrees 90)
+                        |> CsgShape.intersectWith
+                            (CsgShape.cube (Length.centimeters 16)
+                                |> CsgShape.moveForward (Length.centimeters 8)
+                                |> CsgShape.moveLeft (Length.centimeters 8)
+                            )
+                        |> CsgShape.moveUp (Length.centimeters 20)
+                    )
+                |> CsgShape.unionWith hat
+
+        hat =
+            CsgShape.sphereWith
+                { radius =
+                    Length.centimeters 8.4
+                , stacks = 8
+                , slices = 16
+                }
+                |> CsgShape.rotateAround Axis3d.x (Angle.degrees 90)
+                |> CsgShape.scaleBy (Vector3d.meters 1 1 1.1)
+                |> CsgShape.moveUp (Length.centimeters 34)
+    in
+    top
+        |> CsgShape.moveUp (Length.centimeters 12)
+        |> CsgShape.unionWith base
+
+
+eightPawns =
+    CsgShape.group
+        [ pawn
+            |> CsgShape.withColor Color.white
+        , pawn
+            |> CsgShape.moveRight (Length.centimeters (46 * toFloat 1))
+            |> CsgShape.withColor Color.black
+        ]
+        |> CsgShape.moveLeft (Length.centimeters 23)
+        |> CsgShape.scaleAbout Point3d.origin 2

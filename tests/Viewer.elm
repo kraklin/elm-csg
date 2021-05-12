@@ -33,7 +33,7 @@ import Viewpoint3d
 
 
 meshToShow =
-    Models.torus
+    Models.eightPawns
 
 
 type WorldCoordinates
@@ -67,11 +67,11 @@ init () =
       , orbiting = False
       , clipPlanePosition = -0.5
       , mesh =
-            Models.torus
+            meshToShow
                 |> toSceneEntity
 
       --|> toWireframe
-      , showAxis = True
+      , showAxis = False
       , trianglesCount =
             meshToShow
                 |> Csg.toTriangles
@@ -167,7 +167,7 @@ update message model =
                         _ ->
                             Models.allShapes
             in
-            ( { model | mesh = mesh |> toWireframe }, Cmd.none )
+            ( { model | mesh = mesh |> toSceneEntity }, Cmd.none )
 
 
 {-| Use movementX and movementY for simplicity (don't need to store initial

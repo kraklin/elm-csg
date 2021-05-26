@@ -27,7 +27,7 @@ import List
 import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Plane3d exposing (Plane3d)
 import Point3d exposing (Point3d)
-import Quantity
+import Quantity exposing (Unitless)
 import Vector3d exposing (Vector3d)
 
 
@@ -272,21 +272,24 @@ scaleAbout origin factor tree =
                 }
 
 
-scaleBy : Vector3d Meters c -> BspTree c -> BspTree c
+scaleBy : Vector3d Unitless c -> BspTree c -> BspTree c
 scaleBy vector tree =
     let
         ( xScale, yScale, zScale ) =
-            Vector3d.components vector
+            Vector3d.toUnitless vector
+                |> (\{ x, y, z } -> ( x, y, z ))
 
+        scalePoint : Point3d Meters c -> Point3d Meters c
         scalePoint p =
-            Point3d.toMeters p
-                |> (\{ x, y, z } ->
+            Point3d.coordinates p
+                |> (\( x, y, z ) ->
                         Point3d.xyz
-                            (Quantity.multiplyBy x xScale)
-                            (Quantity.multiplyBy y yScale)
-                            (Quantity.multiplyBy z zScale)
+                            (Quantity.multiplyBy xScale x)
+                            (Quantity.multiplyBy yScale y)
+                            (Quantity.multiplyBy zScale z)
                    )
 
+        scaleDirection : Direction3d c -> Direction3d c
         scaleDirection d =
             let
                 ( dx, dy, dz ) =
@@ -294,10 +297,10 @@ scaleBy vector tree =
 
                 handleScale dFloat s =
                     if dFloat < 0 then
-                        -(-dFloat / Length.inMeters s)
+                        -(-dFloat / s)
 
                     else
-                        dFloat / Length.inMeters s
+                        dFloat / s
             in
             Point3d.xyz
                 (Length.meters (handleScale dx xScale))
@@ -306,11 +309,13 @@ scaleBy vector tree =
                 |> Direction3d.from Point3d.origin
                 |> Maybe.withDefault d
 
+        scaleFace : Face c -> Face c
         scaleFace f =
             f.points
                 |> NonEmpty.map scalePoint
                 |> fromPoints (scaleDirection f.normalDirection) f.color
 
+        scalePlane : Plane3d Meters c -> Plane3d Meters c
         scalePlane p =
             Plane3d.originPoint p
                 |> scalePoint

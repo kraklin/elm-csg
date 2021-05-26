@@ -168,11 +168,10 @@ sphericon =
             CsgShape.cone (Length.meters 0.5) (Length.meters 0.5)
 
         twoCones =
-            CsgShape.group
-                [ cone
-                , cone
-                    |> CsgShape.rotateAround Axis3d.x (Angle.degrees 180)
-                ]
+            cone
+                |> CsgShape.rotateAround Axis3d.x (Angle.degrees 180)
+                |> CsgShape.translateBy (Vector3d.meters 0 0 0.001)
+                |> CsgShape.unionWith cone
 
         halfCones =
             (CsgShape.cube (Length.meters 1)
@@ -181,12 +180,7 @@ sphericon =
                 |> CsgShape.subtractFrom
                     twoCones
     in
-    CsgShape.group
-        [ halfCones
-        , halfCones
-            |> CsgShape.rotateAround Axis3d.z (Angle.degrees 180)
-            |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
-        ]
+    halfCones
         |> CsgShape.withColor Color.orange
 
 
@@ -241,7 +235,7 @@ torus =
         bust =
             CsgShape.torus (Length.centimeters 20) (Length.centimeters 60)
                 |> CsgShape.withColor Color.white
-                |> CsgShape.scaleBy (Vector3d.meters 1 1 0.8)
+                |> CsgShape.scaleBy (Vector3d.unitless 1 1 0.8)
                 |> CsgShape.rotateAround Axis3d.y (Angle.degrees 20)
                 |> CsgShape.moveUp (Length.centimeters 25)
                 |> CsgShape.subtractFrom
@@ -307,7 +301,7 @@ pawn =
                 , slices = 16
                 }
                 |> CsgShape.rotateAround Axis3d.x (Angle.degrees 90)
-                |> CsgShape.scaleBy (Vector3d.meters 1 1 1.1)
+                |> CsgShape.scaleBy (Vector3d.unitless 1 1 1.1)
                 |> CsgShape.moveUp (Length.centimeters 34)
     in
     top
@@ -316,12 +310,6 @@ pawn =
 
 
 eightPawns =
-    CsgShape.group
-        [ pawn
-            |> CsgShape.withColor Color.white
-        , pawn
-            |> CsgShape.moveRight (Length.centimeters (46 * toFloat 1))
-            |> CsgShape.withColor Color.black
-        ]
-        |> CsgShape.moveLeft (Length.centimeters 23)
+    pawn
+        |> CsgShape.withColor Color.black
         |> CsgShape.scaleAbout Point3d.origin 2

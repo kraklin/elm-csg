@@ -17,9 +17,13 @@
             "ianmackenzie/elm-geometry": "3.9.0",
             "ianmackenzie/elm-triangular-mesh": "1.1.0",
             "ianmackenzie/elm-units": "2.8.0",
-            "turboMaCk/non-empty-list-alias": "1.1.0"
+            "turboMaCk/non-empty-list-alias": "1.1.0",
+            "w0rm/elm-obj-file": "1.1.0"
         },
         "indirect": {
+            "elm/bytes": "1.0.8",
+            "elm/file": "1.0.5",
+            "elm/http": "2.0.0",
             "elm/random": "1.0.0",
             "elm/time": "1.0.0",
             "elm/url": "1.0.0",

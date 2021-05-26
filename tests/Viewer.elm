@@ -20,6 +20,7 @@ import Json.Decode as Decode exposing (Decoder)
 import Length exposing (Meters)
 import LineSegment3d exposing (LineSegment3d)
 import Models
+import Obj.Encode as Obj
 import Pixels exposing (Pixels)
 import Plane3d
 import Point3d
@@ -33,7 +34,7 @@ import Viewpoint3d
 
 
 meshToShow =
-    Models.eightPawns
+    Models.sphericon
 
 
 type WorldCoordinates
@@ -48,6 +49,7 @@ type alias Model =
     , mesh : Scene3d.Entity WorldCoordinates
     , trianglesCount : Int
     , showAxis : Bool
+    , obj : String
     }
 
 
@@ -56,6 +58,7 @@ type Msg
     | MouseUp
     | MouseMove (Quantity Float Pixels) (Quantity Float Pixels)
     | MeshSelected String
+    | EncodeObj
 
 
 init : () -> ( Model, Cmd Msg )
@@ -69,6 +72,7 @@ init () =
       , mesh =
             meshToShow
                 |> toSceneEntity
+      , obj = ""
 
       --|> toWireframe
       , showAxis = False
@@ -89,6 +93,7 @@ toSceneEntity csg =
             (\( mesh, color ) ->
                 mesh
                     |> Mesh.indexedFaces
+                    |> Mesh.cullBackFaces
                     |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0 })
             )
         |> Scene3d.group
@@ -167,7 +172,16 @@ update message model =
                         _ ->
                             Models.allShapes
             in
-            ( { model | mesh = mesh |> toSceneEntity }, Cmd.none )
+            ( { model | mesh = mesh |> toWireframe }, Cmd.none )
+
+        EncodeObj ->
+            let
+                object =
+                    Models.sphericon
+                        |> Csg.toTriangularMesh
+                        |> Obj.faces
+            in
+            ( { model | obj = Obj.encode Length.inMeters object }, Cmd.none )
 
 
 {-| Use movementX and movementY for simplicity (don't need to store initial
@@ -469,7 +483,7 @@ view model =
         meshSelectDecoder =
             Decode.at [ "target", "value" ] Decode.string
     in
-    { title = "Elm CSG"
+    { title = "Elm CSG )_"
     , body =
         [ Html.div
             [ Attrs.style "position" "absolute"
@@ -503,6 +517,7 @@ view model =
                 , Html.option [ Attrs.value "dice" ] [ Html.text "Dice" ]
                 , Html.option [ Attrs.value "tCube" ] [ Html.text "Transformations cube" ]
                 ]
+            , Html.button [ Events.onClick EncodeObj ] [ Html.text "Create OBJ" ]
             ]
         , Html.div [ Attrs.style "background-color" "rgba(255, 255, 0, 0.2)" ]
             [ Scene3d.cloudy
@@ -521,6 +536,7 @@ view model =
                 , upDirection = Direction3d.positiveZ
                 }
             ]
+        , Html.pre [] [ Html.text model.obj ]
         ]
     }
 

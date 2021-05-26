@@ -34,7 +34,7 @@ import Color exposing (Color)
 import Length exposing (Length, Meters)
 import List.NonEmpty as NonEmpty
 import Point3d exposing (Point3d)
-import Quantity
+import Quantity exposing (Unitless)
 import Triangle3d
 import Vector3d exposing (Vector3d)
 
@@ -386,8 +386,21 @@ coneWith { slices, bottomRadius, bottomPoint, topRadius, topPoint } =
                 bottomPoints
                 topPoints
                 |> List.filterMap toFace
+
+        coneSides =
+            List.map
+                (\( b1, b2 ) ->
+                    [ b1, b2, topPoint ]
+                )
+                bottomPoints
+                |> List.filterMap toFace
     in
-    (bottom ++ sides ++ top)
+    (if Length.inMeters topRadius == 0 then
+        bottom ++ coneSides
+
+     else
+        bottom ++ sides ++ top
+    )
         |> BspTree.build
         |> Shape3d
 
@@ -548,7 +561,7 @@ subtractFrom (Shape3d t1) (Shape3d t2) =
 
 
 {-| TODO: bottleneck for combining lots of complicated models
--- may I create the group somehow differently than chain unionWith?
+-- maybe it would be treated in a simple way when the shapes do not overlap..
 -}
 group : List (Shape3d c) -> Shape3d c
 group csgs =
@@ -625,7 +638,7 @@ scaleAbout origin factor shape =
 -- TODO: needs to be unitless
 
 
-scaleBy : Vector3d Meters c -> Shape3d c -> Shape3d c
+scaleBy : Vector3d Unitless c -> Shape3d c -> Shape3d c
 scaleBy vector shape =
     toTree shape
         |> BspTree.scaleBy vector

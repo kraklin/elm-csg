@@ -181,6 +181,11 @@ sphericon =
                     twoCones
     in
     halfCones
+        |> CsgShape.unionWith
+            (halfCones
+                |> CsgShape.rotateAround Axis3d.z (Angle.degrees 180)
+                |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
+            )
         |> CsgShape.withColor Color.orange
 
 
@@ -197,11 +202,9 @@ transformationsCube =
 
         cylinderY =
             CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters 0 -1 0) (Point3d.meters 0 1 0)
-                |> CsgShape.withColor Color.purple
 
         cylinderX =
             CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters -1 0 0) (Point3d.meters 1 0 0)
-                |> CsgShape.withColor Color.purple
 
         cylinderZ =
             CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters 0 0 -1) (Point3d.meters 0 0 1)
@@ -227,7 +230,6 @@ torus =
                 |> CsgShape.unionWith
                     (CsgShape.cuboid { width = Length.centimeters 5, height = Length.centimeters 50, depth = Length.centimeters 5 }
                         |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
-                        |> CsgShape.moveLeft (Length.centimeters 25)
                         |> CsgShape.moveUp (Length.centimeters 50)
                     )
                 |> CsgShape.withColor Color.gray

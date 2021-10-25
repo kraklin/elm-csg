@@ -10,6 +10,7 @@
   },
   "scripts": {
     "start": "elm-live tests/Viewer.elm",
+    "build": "elm make tests/Viewer.elm --output docs/index.html",
     "test": "elm-test-rs",
     "postinstall": "elm-tooling install"
   }

@@ -166,13 +166,24 @@ update message model =
                         "sphericon" ->
                             Models.sphericon
 
+                        "pawns" ->
+                            Models.eightPawns
+
                         "tCube" ->
                             Models.transformationsCube
 
                         _ ->
                             Models.allShapes
             in
-            ( { model | mesh = mesh |> toWireframe }, Cmd.none )
+            ( { model
+                | mesh =
+                    mesh
+                        |> toSceneEntity
+
+                --|> toWireframe
+              }
+            , Cmd.none
+            )
 
         EncodeObj ->
             let
@@ -514,6 +525,7 @@ view model =
             [ Html.select [ Attrs.id "select", Events.on "change" <| Decode.map MeshSelected meshSelectDecoder ]
                 [ Html.option [ Attrs.value "allShapes" ] [ Html.text "All shapes" ]
                 , Html.option [ Attrs.value "sphericon" ] [ Html.text "Sphericon" ]
+                , Html.option [ Attrs.value "pawns" ] [ Html.text "Chess Pawns" ]
                 , Html.option [ Attrs.value "dice" ] [ Html.text "Dice" ]
                 , Html.option [ Attrs.value "tCube" ] [ Html.text "Transformations cube" ]
                 ]

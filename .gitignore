@@ -7,4 +7,4 @@ elm-stuff
 repl-temp-*
 
 # elm-live generated index.html
-index.html
+./index.html

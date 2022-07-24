@@ -40,6 +40,7 @@ type alias Model =
     { azimuth : Angle -- Orbiting angle of the camera around the focal point
     , elevation : Angle -- Angle of the camera up from the XY plane
     , orbiting : Bool -- Whether the mouse button is currently down
+    , cameraDistance : Length.Length
     , clipPlanePosition : Float
     , csg : CsgShape.Shape3d WorldCoordinates
     , mesh : Scene3d.Entity WorldCoordinates
@@ -65,7 +66,11 @@ init () =
     -- store them in the model
     let
         csg =
-            Models.pawn
+            Models.sphericon
+                |> CsgShape.scaleAbout Point3d.origin 0.3
+
+        cameraDistance =
+            Length.meters 2
 
         mesh =
             csg
@@ -90,13 +95,14 @@ init () =
     ( { azimuth = Angle.degrees -60
       , elevation = Angle.degrees 30
       , orbiting = False
+      , cameraDistance = cameraDistance
       , clipPlanePosition = -0.5
       , csg = csg
       , mesh = mesh
       , lines = lines
       , triCount = triCount
       , showAxis = False
-      , showLines = False
+      , showLines = True
       }
     , Cmd.none
     )
@@ -693,7 +699,7 @@ view model =
                 { focalPoint = Point3d.meters 0 0 0
                 , azimuth = model.azimuth
                 , elevation = model.elevation
-                , distance = Length.meters 3
+                , distance = Length.meters 5
                 }
 
         camera =
@@ -707,7 +713,7 @@ view model =
                 { focalPoint = Point3d.meters 0 0 0
                 , azimuth = model.azimuth
                 , elevation = model.elevation
-                , distance = Length.meters 3
+                , distance = model.cameraDistance
                 }
 
         cameraMesh =
@@ -774,7 +780,7 @@ view model =
                         []
                     )
                         ++ (if model.showLines then
-                                [ model.lines, model.mesh ]
+                                [ model.lines ]
 
                             else
                                 [ model.mesh ]

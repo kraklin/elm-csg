@@ -19,6 +19,7 @@ import Html.Events as Events
 import Json.Decode as Decode exposing (Decoder)
 import Length exposing (Meters)
 import LineSegment3d exposing (LineSegment3d)
+import Models
 import Pixels exposing (Pixels)
 import Plane3d
 import Point3d
@@ -40,8 +41,12 @@ type alias Model =
     , elevation : Angle -- Angle of the camera up from the XY plane
     , orbiting : Bool -- Whether the mouse button is currently down
     , clipPlanePosition : Float
+    , csg : CsgShape.Shape3d WorldCoordinates
     , mesh : Scene3d.Entity WorldCoordinates
+    , lines : Scene3d.Entity WorldCoordinates
     , showAxis : Bool
+    , showLines : Bool
+    , triCount : Int
     }
 
 
@@ -50,27 +55,48 @@ type Msg
     | MouseUp
     | MouseMove (Quantity Float Pixels) (Quantity Float Pixels)
     | PlanePositionChanged String
+    | ToggleLines
+    | ToggleAxis
 
 
 init : () -> ( Model, Cmd Msg )
 init () =
     -- Create a couple of Mesh values containing a single triangle each and
     -- store them in the model
+    let
+        csg =
+            Models.pawn
+
+        mesh =
+            csg
+                |> Csg.toTriangularMeshGroupedByColor
+                |> List.map
+                    (\( mesh_, color ) ->
+                        mesh_
+                            |> Mesh.indexedFaces
+                            |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0.6 })
+                    )
+                |> Scene3d.group
+
+        lines =
+            csg
+                |> Csg.toLineSegments
+                |> Mesh.lineSegments
+                |> Scene3d.mesh (Material.color Color.black)
+
+        triCount =
+            csg |> Csg.toTriangles |> List.length
+    in
     ( { azimuth = Angle.degrees -60
       , elevation = Angle.degrees 30
       , orbiting = False
       , clipPlanePosition = -0.5
-      , mesh =
-            allShapes
-                |> Csg.toTriangularMeshGroupedByColor
-                |> List.map
-                    (\( mesh, color ) ->
-                        mesh
-                            |> Mesh.indexedFaces
-                            |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0 })
-                    )
-                |> Scene3d.group
-      , showAxis = True
+      , csg = csg
+      , mesh = mesh
+      , lines = lines
+      , triCount = triCount
+      , showAxis = False
+      , showLines = False
       }
     , Cmd.none
     )
@@ -120,6 +146,12 @@ update message model =
 
         PlanePositionChanged input ->
             ( { model | clipPlanePosition = String.toFloat input |> Maybe.withDefault 0 }, Cmd.none )
+
+        ToggleLines ->
+            ( { model | showLines = not model.showLines }, Cmd.none )
+
+        ToggleAxis ->
+            ( { model | showAxis = not model.showAxis }, Cmd.none )
 
 
 {-| Use movementX and movementY for simplicity (don't need to store initial
@@ -186,6 +218,7 @@ cylinderZ =
     CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters 0 0 -1) (Point3d.meters 0 0 1)
 
 
+finalCsg : CsgShape.Shape3d WorldCoordinates
 finalCsg =
     let
         cylinders =
@@ -195,10 +228,12 @@ finalCsg =
                 |> CsgShape.withColor Color.green
     in
     cylinders
+        --{--
         |> CsgShape.subtractFrom
             (cube
                 |> CsgShape.intersectWith sphere
             )
+--}
 
 
 allShapes =
@@ -213,7 +248,7 @@ allShapes =
                 , depth = Length.centimeters 20
                 , height = Length.centimeters 30
                 }
-                |> CsgShape.withColor Color.blue
+                |> CsgShape.withColor Color.red
 
         cone =
             CsgShape.cone (Length.centimeters 5) (Length.centimeters 20)
@@ -257,17 +292,19 @@ allShapes =
 
 
 finalCsg4 =
-    CsgShape.cube (Length.meters 1)
-        |> CsgShape.scaleBy (Vector3d.meters 0.4 1 1)
-        |> CsgShape.rotateAround Axis3d.y (Angle.degrees -45)
+    CsgShape.cube (Length.meters 2)
+        |> CsgShape.withColor Color.yellow
+        |> CsgShape.scaleBy (Vector3d.unitless 0.4 1 1)
+        |> CsgShape.rotateAround Axis3d.y (Angle.degrees -70)
         |> CsgShape.translateBy (Vector3d.meters 0 0 0.7)
-        |> CsgShape.scaleBy (Vector3d.meters 2 1 1)
+        |> CsgShape.scaleBy (Vector3d.unitless 2 1 1)
         |> CsgShape.rotateAround Axis3d.y (Angle.degrees 22.5)
         |> CsgShape.subtractFrom
             (CsgShape.sphere (Length.meters 1)
-                |> CsgShape.scaleBy (Vector3d.meters 2 1 1)
+                |> CsgShape.scaleBy (Vector3d.unitless 2 1 1)
+                |> CsgShape.withColor Color.green
             )
-        |> CsgShape.scaleBy (Vector3d.meters 0.5 1 1)
+        |> CsgShape.scaleBy (Vector3d.unitless 0.5 1 1)
 
 
 finalCsg5 =
@@ -350,14 +387,14 @@ finalCsg5 =
     dots
         |> CsgShape.subtractFrom base
         |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 0.5)
-        |> CsgShape.scaleBy (Vector3d.meters 2 1 1)
+        |> CsgShape.scaleBy (Vector3d.unitless 2 1 1)
         |> CsgShape.rotateAround Axis3d.x (Angle.degrees -45)
 
 
 finalCsg7 =
     --|> Csg.scaleBy (Vector3d.meters 1.5 0.5 1)
     (CsgShape.cube (Length.meters 1)
-        |> CsgShape.translateBy (Vector3d.meters -0.5 0 0.5)
+        |> CsgShape.translateBy (Vector3d.meters -0.5 0 -0.1)
     )
         |> CsgShape.unionWith cube
 
@@ -393,7 +430,7 @@ finalCsg6 =
     CsgShape.group
         [ sphericon
         , sphericon
-            |> CsgShape.scaleBy (Vector3d.meters 1.2 1 0.5)
+            |> CsgShape.scaleBy (Vector3d.unitless 1.2 1 0.5)
             |> CsgShape.translateBy (Vector3d.meters 1.2 0 0)
             |> CsgShape.withColor Color.green
         ]
@@ -412,7 +449,7 @@ trianglesCount csg =
 
 
 sphere =
-    CsgShape.sphere (Length.centimeters 70)
+    CsgShape.sphere (Length.centimeters 69)
         |> CsgShape.withColor Color.blue
 
 
@@ -656,7 +693,7 @@ view model =
                 { focalPoint = Point3d.meters 0 0 0
                 , azimuth = model.azimuth
                 , elevation = model.elevation
-                , distance = Length.meters 7
+                , distance = Length.meters 3
                 }
 
         camera =
@@ -670,7 +707,7 @@ view model =
                 { focalPoint = Point3d.meters 0 0 0
                 , azimuth = model.azimuth
                 , elevation = model.elevation
-                , distance = Length.meters 2
+                , distance = Length.meters 3
                 }
 
         cameraMesh =
@@ -699,11 +736,29 @@ view model =
                 , shadows = True
                 , sunlightDirection = Direction3d.positiveZ
                 }
+            , Html.div []
+                [ Html.input
+                    [ Attrs.checked model.showLines
+                    , Attrs.type_ "checkbox"
+                    , Events.onClick ToggleLines
+                    , Attrs.id "lines"
+                    ]
+                    []
+                , Html.label [ Attrs.for "lines" ] [ Html.text "Lines" ]
+                , Html.input
+                    [ Attrs.checked model.showAxis
+                    , Attrs.type_ "checkbox"
+                    , Attrs.id "axis"
+                    , Events.onClick ToggleAxis
+                    ]
+                    []
+                , Html.label [ Attrs.for "axis" ] [ Html.text "Axis" ]
+                ]
             , Html.span
                 [ Attrs.style "padding-right" "24px"
                 , Attrs.style "user-select" "none"
                 ]
-                [ Html.text <| "tri count: " ++ (String.fromInt <| trianglesCount allShapes) ]
+                [ Html.text <| "tri count: " ++ String.fromInt model.triCount ]
             ]
         , Html.div [ Attrs.style "background-color" "rgba(255, 255, 0, 0.2)" ]
             [ Scene3d.cloudy
@@ -718,7 +773,12 @@ view model =
                      else
                         []
                     )
-                        ++ [ model.mesh ]
+                        ++ (if model.showLines then
+                                [ model.lines, model.mesh ]
+
+                            else
+                                [ model.mesh ]
+                           )
                 , upDirection = Direction3d.positiveZ
                 }
             ]

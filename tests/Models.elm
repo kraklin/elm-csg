@@ -1,5 +1,6 @@
 module Models exposing
     ( allShapes
+    , debug
     , dice
     , eightPawns
     , pawn
@@ -180,6 +181,11 @@ sphericon =
                 |> CsgShape.subtractFrom
                     twoCones
     in
+    twoCones
+
+
+
+{--
     halfCones
         |> CsgShape.unionWith
             (halfCones
@@ -187,6 +193,7 @@ sphericon =
                 |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
             )
         |> CsgShape.withColor Color.orange
+        --}
 
 
 transformationsCube =
@@ -222,6 +229,29 @@ transformationsCube =
             )
 
 
+debug =
+    let
+        visor =
+            CsgShape.cuboid { width = Length.centimeters 5, height = Length.centimeters 50, depth = Length.centimeters 5 }
+                |> CsgShape.moveRight (Length.centimeters 22.5)
+                |> CsgShape.unionWith
+                    (CsgShape.cuboid { width = Length.centimeters 5, height = Length.centimeters 50, depth = Length.centimeters 5 }
+                        |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
+                        |> CsgShape.moveUp (Length.centimeters 50)
+                    )
+                |> CsgShape.withColor Color.gray
+
+        bust =
+            CsgShape.torus (Length.centimeters 22) (Length.centimeters 60)
+                |> CsgShape.moveLeft (Length.centimeters 25)
+                |> CsgShape.subtractFrom
+                    (CsgShape.cylinder (Length.centimeters 40) (Length.centimeters 80)
+                        |> CsgShape.withColor Color.black
+                    )
+    in
+    bust
+
+
 torus =
     let
         visor =
@@ -253,6 +283,15 @@ torus =
 
 
 simpleTransformations =
+    CsgShape.cube (Length.meters 1)
+        |> CsgShape.moveLeft (Length.meters 0.5)
+        |> CsgShape.moveUp (Length.meters 0.5)
+        |> CsgShape.moveForward (Length.meters 0.5)
+        |> CsgShape.unionWith
+            (CsgShape.cube (Length.meters 1))
+
+
+simpleUnion =
     CsgShape.cube (Length.meters 1)
         |> CsgShape.moveLeft (Length.meters 0.5)
         |> CsgShape.intersectWith

@@ -66,11 +66,11 @@ init () =
     -- store them in the model
     let
         csg =
-            Models.sphericon
-                |> CsgShape.scaleAbout Point3d.origin 0.3
+            Models.transformationsCube
+                |> CsgShape.scaleAbout Point3d.origin 1
 
         cameraDistance =
-            Length.meters 2
+            Length.meters 10
 
         mesh =
             csg

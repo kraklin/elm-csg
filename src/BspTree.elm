@@ -60,6 +60,7 @@ type Orientation
 type alias IntersectionResult c =
     { outside : Maybe (Face c)
     , inside : Maybe (Face c)
+    , originalFace : Maybe (Face c)
     }
 
 
@@ -122,7 +123,7 @@ toFaces tree =
                     []
 
                 Node { faces, inside, outside } ->
-                    NonEmpty.toList faces ++ (traverse inside ++ traverse outside)
+                    NonEmpty.toList faces ++ traverse inside ++ traverse outside
     in
     traverse tree
 
@@ -393,16 +394,45 @@ findInside orientation tree face =
             in
             (if classification.class == Coplanar then
                 if getOrientation nodeData.plane classification == orientation then
-                    { inside = Just face, outside = Nothing }
+                    { inside = Just face, outside = Nothing, originalFace = Nothing }
 
                 else
-                    { inside = Nothing, outside = Just face }
+                    { inside = Nothing, outside = Just face, originalFace = Nothing }
 
              else
                 splitByPlane nodeData.plane face
             )
-                |> (\{ inside, outside } ->
-                        handleInside inside nodeData.inside ++ handleOutside outside nodeData.outside
+                |> (\{ inside, outside, originalFace } ->
+                        let
+                            insideFaces =
+                                handleInside inside nodeData.inside
+
+                            outsideFaces =
+                                handleOutside outside nodeData.outside
+
+                            hasInsideCandidate =
+                                case inside of
+                                    Nothing ->
+                                        False
+
+                                    Just insideFace ->
+                                        not <| List.isEmpty insideFaces
+
+                            hasOutsideCandidate =
+                                case outside of
+                                    Nothing ->
+                                        False
+
+                                    Just outsideFace ->
+                                        not <| List.isEmpty outsideFaces
+                        in
+                        case ( originalFace, hasOutsideCandidate ) of
+                            ( Just origin, True ) ->
+                                [ origin ]
+
+                            _ ->
+                                insideFaces ++ outsideFaces
+                    --}
                    )
 
 
@@ -447,17 +477,50 @@ findOutside orientation tree face =
             in
             (if classification.class == Coplanar then
                 if getOrientation nodeData.plane classification == orientation then
-                    { inside = Nothing, outside = Just face }
+                    { inside = Nothing, outside = Just face, originalFace = Nothing }
 
                 else
-                    { inside = Just face, outside = Nothing }
+                    { inside = Just face, outside = Nothing, originalFace = Nothing }
 
              else
                 splitByPlane nodeData.plane face
             )
-                |> (\{ inside, outside } ->
-                        handleInside inside nodeData.inside ++ handleOutside outside nodeData.outside
+                |> (\{ inside, outside, originalFace } ->
+                        let
+                            insideFaces =
+                                handleInside inside nodeData.inside
+
+                            outsideFaces =
+                                handleOutside outside nodeData.outside
+
+                            hasInsideCandidate =
+                                case inside of
+                                    Nothing ->
+                                        False
+
+                                    Just insideFace ->
+                                        List.any (areFacesSame insideFace) insideFaces
+                        in
+                        case ( originalFace, hasInsideCandidate ) of
+                            ( Just origin, True ) ->
+                                [ origin ]
+
+                            _ ->
+                                insideFaces ++ outsideFaces
                    )
+
+
+areFacesSame : Face c -> Face c -> Bool
+areFacesSame faceA faceB =
+    let
+        pointsA =
+            allPoints faceA
+
+        pointsB =
+            allPoints faceB
+    in
+    pointsA
+        |> List.all (\a -> List.member a pointsB)
 
 
 invertFaces : List (Face c) -> List (Face c)
@@ -576,16 +639,16 @@ splitByPlane plane face =
     case classifiedFace.class of
         Coplanar ->
             if isOutside face then
-                { outside = Just face, inside = Nothing }
+                { outside = Just face, inside = Nothing, originalFace = Nothing }
 
             else
-                { outside = Nothing, inside = Just face }
+                { outside = Nothing, inside = Just face, originalFace = Nothing }
 
         Outside ->
-            { outside = Just face, inside = Nothing }
+            { outside = Just face, inside = Nothing, originalFace = Nothing }
 
         Inside ->
-            { outside = Nothing, inside = Just face }
+            { outside = Nothing, inside = Just face, originalFace = Nothing }
 
         Spanning ->
             let
@@ -663,4 +726,4 @@ splitByPlane plane face =
                         }
                     )
                     { outside = [], inside = [] }
-                |> (\{ outside, inside } -> { outside = toFace outside, inside = toFace inside })
+                |> (\{ outside, inside } -> { outside = toFace outside, inside = toFace inside, originalFace = Just face })

@@ -68,22 +68,17 @@ init () =
     -- store them in the model
     let
         csg =
-            Models.torus
-                |> CsgShape.scaleAbout Point3d.origin 1
+            CsgShape.cube (Length.meters 1)
 
         cameraDistance =
             Length.meters 10
 
         mesh =
             csg
-                |> Csg.toTriangularMeshGroupedByColor
-                |> List.map
-                    (\( mesh_, color ) ->
-                        mesh_
-                            |> Mesh.indexedFaces
-                            |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0.6 })
-                    )
-                |> Scene3d.group
+                |> Csg.toPlaneBased
+                |> Csg.planeBasedTriangularMesh
+                |> Mesh.indexedFaces
+                |> Scene3d.mesh (Material.metal { baseColor = Color.darkGray, roughness = 0.6 })
 
         lines =
             csg

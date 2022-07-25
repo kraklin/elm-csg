@@ -19,6 +19,7 @@
             "ianmackenzie/elm-triangular-mesh": "1.1.0",
             "ianmackenzie/elm-units": "2.8.0",
             "mpizenberg/elm-pointer-events": "4.0.2",
+            "ryry0/elm-numeric": "1.0.0",
             "turboMaCk/non-empty-list-alias": "1.1.0",
             "w0rm/elm-obj-file": "1.1.0"
         },

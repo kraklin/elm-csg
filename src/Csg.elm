@@ -1,6 +1,8 @@
 module Csg exposing
-    ( toLineSegments
+    ( planeBasedTriangularMesh
+    , toLineSegments
     , toLinesAndNormals
+    , toPlaneBased
     , toTriangles
     , toTriangularMesh
     , toTriangularMeshGroupedByColor
@@ -8,6 +10,7 @@ module Csg exposing
 
 import BspTree exposing (Face)
 import Color exposing (Color)
+import Csg.PlaneBased as PlaneBased exposing (PlaneBasedFace)
 import Csg.Shape3d exposing (Shape3d)
 import Dict exposing (Dict)
 import Direction3d
@@ -163,3 +166,37 @@ toTriangularMeshGroupedByColor shape =
         |> List.foldl toColoredMeshMap Dict.empty
         |> Dict.map (\( r, g, b ) meshes -> ( TriangularMesh.combine meshes, Color.rgb r g b ))
         |> Dict.values
+
+
+
+-- Plane based CSG
+
+
+toPlaneBased : Shape3d c -> List (PlaneBasedFace c)
+toPlaneBased shape =
+    shape
+        |> Csg.Shape3d.toFaces
+        |> List.take 1
+        |> List.filterMap PlaneBased.fromFace
+
+
+planeBasedTriangularMesh : List (PlaneBasedFace c) -> TriangularMesh (Vertex c)
+planeBasedTriangularMesh planeBasedFaces =
+    let
+        toVertex face point =
+            { position = point
+            , normal =
+                Direction3d.toVector face.normalDirection
+                    |> Vector3d.normalize
+            }
+
+        toFan face =
+            NonEmpty.tail face.points
+                |> List.map (toVertex face)
+                |> TriangularMesh.fan (toVertex face (NonEmpty.head face.points))
+    in
+    planeBasedFaces
+        |> List.map PlaneBased.toFace
+        |> Debug.log "face"
+        |> List.map toFan
+        |> TriangularMesh.combine

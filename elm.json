@@ -12,11 +12,13 @@
             "elm/core": "1.0.5",
             "elm/html": "1.0.0",
             "elm/json": "1.1.3",
+            "elm-community/list-extra": "8.6.0",
             "ianmackenzie/elm-3d-camera": "3.1.0",
             "ianmackenzie/elm-3d-scene": "1.0.1",
             "ianmackenzie/elm-geometry": "3.9.0",
             "ianmackenzie/elm-triangular-mesh": "1.1.0",
             "ianmackenzie/elm-units": "2.8.0",
+            "mpizenberg/elm-pointer-events": "4.0.2",
             "turboMaCk/non-empty-list-alias": "1.1.0",
             "w0rm/elm-obj-file": "1.1.0"
         },

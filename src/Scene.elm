@@ -16,6 +16,7 @@ import Direction3d
 import Html
 import Html.Attributes as Attrs
 import Html.Events as Events
+import Html.Events.Extra.Wheel as Wheel
 import Json.Decode as Decode exposing (Decoder)
 import Length exposing (Meters)
 import LineSegment3d exposing (LineSegment3d)
@@ -54,6 +55,7 @@ type alias Model =
 type Msg
     = MouseDown
     | MouseUp
+    | MouseWheel Float
     | MouseMove (Quantity Float Pixels) (Quantity Float Pixels)
     | PlanePositionChanged String
     | ToggleLines
@@ -66,7 +68,7 @@ init () =
     -- store them in the model
     let
         csg =
-            Models.transformationsCube
+            Models.torus
                 |> CsgShape.scaleAbout Point3d.origin 1
 
         cameraDistance =
@@ -149,6 +151,16 @@ update message model =
 
             else
                 ( model, Cmd.none )
+
+        MouseWheel dy ->
+            ( { model
+                | cameraDistance =
+                    model.cameraDistance
+                        |> Quantity.plus (Quantity.timesUnitless (Quantity.float dy) (Length.meters 0.1))
+                        |> Quantity.clamp (Length.meters 0.1) (Length.meters 30)
+              }
+            , Cmd.none
+            )
 
         PlanePositionChanged input ->
             ( { model | clipPlanePosition = String.toFloat input |> Maybe.withDefault 0 }, Cmd.none )
@@ -448,10 +460,6 @@ finalCsg6 =
    |> Mesh.lineSegments
    |> Scene3d.mesh (Material.color Color.green)
 -}
-
-
-trianglesCount csg =
-    csg |> Csg.toTriangles |> List.length
 
 
 sphere =
@@ -766,7 +774,10 @@ view model =
                 ]
                 [ Html.text <| "tri count: " ++ String.fromInt model.triCount ]
             ]
-        , Html.div [ Attrs.style "background-color" "rgba(255, 255, 0, 0.2)" ]
+        , Html.div
+            [ Attrs.style "background-color" "rgba(255, 255, 0, 0.2)"
+            , Wheel.onWheel (.deltaY >> MouseWheel)
+            ]
             [ Scene3d.cloudy
                 { camera = cameraMesh
                 , clipDepth = Length.meters 0.1

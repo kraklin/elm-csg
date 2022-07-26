@@ -20,6 +20,7 @@ module Csg.Shape3d exposing
     , sphere
     , sphereWith
     , subtractFrom
+    , toFace
     , toFaces
     , torus
     , translateBy

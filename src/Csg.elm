@@ -176,7 +176,6 @@ toPlaneBased : Shape3d c -> List (PlaneBasedFace c)
 toPlaneBased shape =
     shape
         |> Csg.Shape3d.toFaces
-        |> List.take 1
         |> List.filterMap PlaneBased.fromFace
 
 
@@ -196,7 +195,6 @@ planeBasedTriangularMesh planeBasedFaces =
                 |> TriangularMesh.fan (toVertex face (NonEmpty.head face.points))
     in
     planeBasedFaces
-        |> List.map PlaneBased.toFace
-        |> Debug.log "face"
+        |> List.filterMap PlaneBased.toFace
         |> List.map toFan
         |> TriangularMesh.combine

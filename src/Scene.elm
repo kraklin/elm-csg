@@ -11,6 +11,7 @@ import Browser.Events
 import Camera3d
 import Color
 import Csg
+import Csg.PlaneBased as PlaneBased
 import Csg.Shape3d as CsgShape
 import Direction3d
 import Html
@@ -76,13 +77,16 @@ init () =
         mesh =
             csg
                 |> Csg.toPlaneBased
+                |> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.5 0.5 0.5) Direction3d.y)
                 |> Csg.planeBasedTriangularMesh
                 |> Mesh.indexedFaces
-                |> Scene3d.mesh (Material.metal { baseColor = Color.darkGray, roughness = 0.6 })
+                |> Scene3d.mesh (Material.metal { baseColor = Color.gray, roughness = 0.6 })
 
         lines =
             csg
-                |> Csg.toLineSegments
+                |> Csg.toPlaneBased
+                |> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.5 0.5 0.5) Direction3d.y)
+                |> Csg.planeBasedTriangularMeshToLineSegment
                 |> Mesh.lineSegments
                 |> Scene3d.mesh (Material.color Color.black)
 

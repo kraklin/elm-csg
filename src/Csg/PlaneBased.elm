@@ -22,10 +22,9 @@ type alias PlaneEquation =
     { a : Float, b : Float, c : Float, d : Float }
 
 
-type alias PlaneBasedFace c =
+type alias PlaneBasedFace =
     { supportPlane : PlaneEquation
     , boundingPlanes : NonEmptyTriplet PlaneEquation
-    , tempFace : Face c
     }
 
 
@@ -52,7 +51,7 @@ planeCoeficients plane =
     { a = a, b = b, c = c, d = d }
 
 
-fromFace : Face c -> Maybe (PlaneBasedFace c)
+fromFace : Face c -> Maybe PlaneBasedFace
 fromFace face =
     let
         fromPoints points =
@@ -90,7 +89,6 @@ fromFace face =
             (\boundingPlanes ->
                 { supportPlane = Plane3d.through (NonEmpty.head face.points) face.normalDirection |> planeCoeficients
                 , boundingPlanes = boundingPlanes
-                , tempFace = face
                 }
             )
 
@@ -143,7 +141,7 @@ toFace_ points =
             Nothing
 
 
-toFace : PlaneBasedFace c -> Maybe (Face c)
+toFace : PlaneBasedFace -> Maybe (Face c)
 toFace planebased =
     let
         toPlanesTriplets ( ( p, q, r ), rest ) =
@@ -158,11 +156,39 @@ toFace planebased =
                             _ ->
                                 Nothing
                     )
-
-        _ =
-            toPlanesTriplets planebased.boundingPlanes
-                |> List.map planesIntersection
     in
     toPlanesTriplets planebased.boundingPlanes
         |> List.map planesIntersection
         |> toFace_
+
+
+splitByPlane : Plane3d Meters c -> List PlaneBasedFace -> List PlaneBasedFace
+splitByPlane splittingPlane faces =
+    let
+        splittingPlaneCoef =
+            planeCoeficients splittingPlane
+
+        isSimilaryOriented p q =
+            p.a == q.a && p.b == q.b && p.c == q.c
+
+        det2 a b c d =
+            a * d - b * c
+
+        isCoincident p q =
+            (det2 p.a p.b q.a q.b == 0)
+                && (det2 p.b p.c q.b q.c == 0)
+                && (det2 p.c p.d q.c q.d == 0)
+
+        splitFaceByPlane face =
+            if isCoincident splittingPlaneCoef face.supportPlane then
+                if isSimilaryOriented splittingPlaneCoef face.supportPlane then
+                    Just face
+
+                else
+                    Nothing
+
+            else
+                Just face
+    in
+    faces
+        |> List.filterMap splitFaceByPlane

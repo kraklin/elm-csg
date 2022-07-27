@@ -1,5 +1,6 @@
 module Csg exposing
     ( planeBasedTriangularMesh
+    , planeBasedTriangularMeshToLineSegment
     , toLineSegments
     , toLinesAndNormals
     , toPlaneBased
@@ -172,14 +173,14 @@ toTriangularMeshGroupedByColor shape =
 -- Plane based CSG
 
 
-toPlaneBased : Shape3d c -> List (PlaneBasedFace c)
+toPlaneBased : Shape3d c -> List PlaneBasedFace
 toPlaneBased shape =
     shape
         |> Csg.Shape3d.toFaces
         |> List.filterMap PlaneBased.fromFace
 
 
-planeBasedTriangularMesh : List (PlaneBasedFace c) -> TriangularMesh (Vertex c)
+planeBasedTriangularMesh : List PlaneBasedFace -> TriangularMesh (Vertex c)
 planeBasedTriangularMesh planeBasedFaces =
     let
         toVertex face point =
@@ -198,3 +199,33 @@ planeBasedTriangularMesh planeBasedFaces =
         |> List.filterMap PlaneBased.toFace
         |> List.map toFan
         |> TriangularMesh.combine
+
+
+planeBasedTriangularMeshToLineSegment : List PlaneBasedFace -> List (LineSegment3d Length.Meters coordinates)
+planeBasedTriangularMeshToLineSegment faces =
+    let
+        centroid : ( Vertex c, Vertex c, Vertex c ) -> Point3d Meters c
+        centroid ( v1, v2, v3 ) =
+            Point3d.centroid3 v1.position v2.position v3.position
+
+        normalEnd : ( Vertex c, Vertex c, Vertex c ) -> Point3d Meters c
+        normalEnd (( v1, _, _ ) as vertices) =
+            Point3d.translateBy
+                (Vector3d.toUnitless v1.normal
+                    |> Vector3d.fromMeters
+                    |> Vector3d.scaleBy 0.2
+                )
+                (centroid vertices)
+
+        triangleSegments ( v1, v2, v3 ) =
+            [ LineSegment3d.from v1.position v2.position
+            , LineSegment3d.from v2.position v3.position
+            , LineSegment3d.from v3.position v1.position
+            ]
+    in
+    faces
+        |> List.filterMap PlaneBased.toFace
+        |> List.map facesToTriangles
+        |> List.concat
+        |> List.map (.vertices >> triangleSegments)
+        |> List.concat

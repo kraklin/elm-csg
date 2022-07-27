@@ -179,6 +179,71 @@ splitByPlane splittingPlane faces =
                 && (det2 p.b p.c q.b q.c == 0)
                 && (det2 p.c p.d q.c q.d == 0)
 
+        boundingPlanesCandidates planes =
+            planes
+                ++ List.take 3 planes
+                |> List.groupsOfWithStep 4 1
+                |> List.filterMap
+                    (\groupPlanes ->
+                        case groupPlanes of
+                            [ a, b, c, d ] ->
+                                Just { prev2 = a, prev = b, curr = c, next = d }
+
+                            _ ->
+                                Nothing
+                    )
+
+        distance point =
+            Point3d.toMeters point
+                |> (\{ x, y, z } ->
+                        (splittingPlaneCoef.a * x + splittingPlaneCoef.b * y + splittingPlaneCoef.c * z + splittingPlaneCoef.d)
+                            / sqrt
+                                (splittingPlaneCoef.a ^ 2 + splittingPlaneCoef.b ^ 2 + splittingPlaneCoef.c ^ 2)
+                   )
+
+        outputPlane s bPlanes =
+            let
+                classifyPrev =
+                    planesIntersection ( s, bPlanes.prev2, bPlanes.prev )
+                        |> distance
+                        |> Debug.log "prev"
+
+                classifyCurr =
+                    planesIntersection ( s, bPlanes.prev, bPlanes.curr )
+                        |> distance
+                        |> Debug.log "curr"
+
+                classifyNext =
+                    planesIntersection ( s, bPlanes.curr, bPlanes.next )
+                        |> distance
+                        |> Debug.log "next"
+            in
+            case ( compare classifyPrev 0, compare classifyCurr 0, compare classifyNext 0 ) of
+                ( _, GT, _ ) ->
+                    Just [ bPlanes.curr ]
+
+                ( GT, EQ, GT ) ->
+                    Just [ bPlanes.curr ]
+
+                ( _, EQ, GT ) ->
+                    Just [ splittingPlaneCoef, bPlanes.curr ]
+
+                ( _, LT, GT ) ->
+                    Just [ splittingPlaneCoef, bPlanes.curr ]
+
+                ( _, EQ, EQ ) ->
+                    Nothing
+
+                ( _, EQ, LT ) ->
+                    Nothing
+
+                _ ->
+                    Nothing
+
+        tripletToList ( ( p, q, r ), rest ) =
+            p :: q :: r :: rest
+
+        splitFaceByPlane : PlaneBasedFace -> Maybe PlaneBasedFace
         splitFaceByPlane face =
             if isCoincident splittingPlaneCoef face.supportPlane then
                 if isSimilaryOriented splittingPlaneCoef face.supportPlane then
@@ -188,7 +253,19 @@ splitByPlane splittingPlane faces =
                     Nothing
 
             else
-                Just face
+                face.boundingPlanes
+                    |> tripletToList
+                    |> boundingPlanesCandidates
+                    |> List.filterMap (outputPlane face.supportPlane)
+                    |> List.concat
+                    |> (\planes ->
+                            case planes of
+                                p :: q :: r :: rest ->
+                                    Just { face | boundingPlanes = ( ( p, q, r ), rest ) }
+
+                                _ ->
+                                    Nothing
+                       )
     in
     faces
         |> List.filterMap splitFaceByPlane

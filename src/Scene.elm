@@ -69,7 +69,7 @@ init () =
     -- store them in the model
     let
         csg =
-            CsgShape.cube (Length.meters 1)
+            CsgShape.sphere (Length.meters 1)
 
         cameraDistance =
             Length.meters 10
@@ -77,7 +77,7 @@ init () =
         mesh =
             csg
                 |> Csg.toPlaneBased
-                |> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.5 0.5 0.5) Direction3d.y)
+                |> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.5 0.5 0.5) Direction3d.negativeZ)
                 |> Csg.planeBasedTriangularMesh
                 |> Mesh.indexedFaces
                 |> Scene3d.mesh (Material.metal { baseColor = Color.gray, roughness = 0.6 })
@@ -85,7 +85,7 @@ init () =
         lines =
             csg
                 |> Csg.toPlaneBased
-                |> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.5 0.5 0.5) Direction3d.y)
+                |> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.5 0.5 0.5) Direction3d.z)
                 |> Csg.planeBasedTriangularMeshToLineSegment
                 |> Mesh.lineSegments
                 |> Scene3d.mesh (Material.color Color.black)

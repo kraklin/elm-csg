@@ -204,6 +204,9 @@ planeBasedTriangularMesh planeBasedFaces =
 planeBasedTriangularMeshToLineSegment : List PlaneBasedFace -> List (LineSegment3d Length.Meters coordinates)
 planeBasedTriangularMeshToLineSegment faces =
     let
+        withNormals =
+            True
+
         centroid : ( Vertex c, Vertex c, Vertex c ) -> Point3d Meters c
         centroid ( v1, v2, v3 ) =
             Point3d.centroid3 v1.position v2.position v3.position
@@ -222,6 +225,12 @@ planeBasedTriangularMeshToLineSegment faces =
             , LineSegment3d.from v2.position v3.position
             , LineSegment3d.from v3.position v1.position
             ]
+                ++ (if withNormals then
+                        [ LineSegment3d.from (centroid ( v1, v2, v3 )) (normalEnd ( v1, v2, v3 )) ]
+
+                    else
+                        []
+                   )
     in
     faces
         |> List.filterMap PlaneBased.toFace

@@ -69,23 +69,35 @@ init () =
     -- store them in the model
     let
         csg =
-            CsgShape.sphere (Length.meters 1)
+            CsgShape.sphereWith { stacks = 16, slices = 16, radius = Length.meters 1 }
 
         cameraDistance =
             Length.meters 10
 
+        splitBy =
+            identity
+
+        --PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.2 0.2 0.2) (Direction3d.xz (Angle.degrees 45)))
+        --PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.4 0.4 0.4) Direction3d.negativeZ)
+        -->> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.2 0.2 0.2) Direction3d.z)
+        planeBased =
+            PlaneBased.cube (Length.meters 1)
+
+        --CsgShape.cube (Length.meters 1)
+        --CsgShape.sphere (Length.meters 1)
+        --Models.transformationsCube
+        --Models.pawn
+        --|> Csg.toPlaneBased
         mesh =
-            csg
-                |> Csg.toPlaneBased
-                |> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.5 0.5 0.5) Direction3d.negativeZ)
+            planeBased
+                |> splitBy
                 |> Csg.planeBasedTriangularMesh
                 |> Mesh.indexedFaces
                 |> Scene3d.mesh (Material.metal { baseColor = Color.gray, roughness = 0.6 })
 
         lines =
-            csg
-                |> Csg.toPlaneBased
-                |> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.5 0.5 0.5) Direction3d.z)
+            planeBased
+                |> splitBy
                 |> Csg.planeBasedTriangularMeshToLineSegment
                 |> Mesh.lineSegments
                 |> Scene3d.mesh (Material.color Color.black)

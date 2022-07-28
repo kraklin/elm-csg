@@ -483,12 +483,31 @@ torus innerRadius outerRadius =
                                             { previous = Just ( p3, p4 ), faces = faces }
 
                                         Just ( p1, p2 ) ->
-                                            { previous = Just ( p3, p4 ), faces = toFace [ p1, p2, p4, p3 ] :: faces }
+                                            { previous = Just ( p3, p4 ), faces = toFace_ [ p1, p2, p4, p3 ] :: faces }
                                 )
                                 { previous = Nothing, faces = [] }
                             |> .faces
                             |> List.filterMap identity
                     )
+
+        toFace_ points =
+            let
+                maybeNormal tri =
+                    tri
+                        |> Triangle3d.normalDirection
+            in
+            case points of
+                v1 :: v2 :: v3 :: rest ->
+                    maybeNormal (Triangle3d.from v1 v2 v3)
+                        |> Maybe.map
+                            (\normal ->
+                                Face (NonEmpty.fromCons v1 (v2 :: v3 :: rest))
+                                    normal
+                                    defaultColor
+                            )
+
+                _ ->
+                    Nothing
     in
     allCircles
         |> List.concat

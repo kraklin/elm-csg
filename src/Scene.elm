@@ -65,6 +65,7 @@ type Msg
     | PlanePositionChanged String
     | ToggleLines
     | ToggleAxis
+    | ToggleAnimation
 
 
 init : () -> ( Model, Cmd Msg )
@@ -73,7 +74,8 @@ init () =
     -- store them in the model
     let
         csg =
-            CsgShape.sphereWith { stacks = 16, slices = 16, radius = Length.meters 1 }
+            --CsgShape.sphereWith { stacks = 16, slices = 16, radius = Length.meters 1 }
+            Models.transformationsCube
 
         cameraDistance =
             Length.meters 10
@@ -86,13 +88,13 @@ init () =
         -->> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.2 0.2 0.2) Direction3d.z)
         planeBased =
             --PlaneBased.cube (Length.meters 1)
-            PlaneBased.sphere
+            --PlaneBased.sphere
+            --CsgShape.cube (Length.meters 1)
+            --CsgShape.sphere (Length.meters 1)
+            Models.transformationsCube
+                --Models.pawn
+                |> Csg.toPlaneBased
 
-        --CsgShape.cube (Length.meters 1)
-        --CsgShape.sphere (Length.meters 1)
-        --Models.transformationsCube
-        --Models.pawn
-        --|> Csg.toPlaneBased
         mesh =
             planeBased
                 |> splitBy
@@ -131,7 +133,7 @@ init () =
     ( { azimuth = Angle.degrees -60
       , elevation = Angle.degrees 30
       , orbiting = False
-      , animate = True
+      , animate = False
       , cameraDistance = cameraDistance
       , clipPlanePosition = -0.5
       , csg = csg
@@ -213,6 +215,9 @@ update message model =
         ToggleAxis ->
             ( { model | showAxis = not model.showAxis }, Cmd.none )
 
+        ToggleAnimation ->
+            ( { model | animate = not model.animate }, Cmd.none )
+
 
 {-| Use movementX and movementY for simplicity (don't need to store initial
 mouse position in the model) - not supported in Internet Explorer though
@@ -226,27 +231,27 @@ decodeMouseMove =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.batch
-        [ if model.animate then
-            Time.every 50 (always RotateCamera)
+    if model.orbiting then
+        -- If we're currently orbiting, listen for mouse moves and mouse button
+        -- up events (to stop orbiting); in a real app we'd probably also want
+        -- to listen for page visibility changes to stop orbiting if the user
+        -- switches to a different tab or something
+        Sub.batch
+            [ Browser.Events.onMouseMove decodeMouseMove
+            , Browser.Events.onMouseUp (Decode.succeed MouseUp)
+            ]
 
-          else
-            Sub.none
-        , if model.orbiting then
-            -- If we're currently orbiting, listen for mouse moves and mouse button
-            -- up events (to stop orbiting); in a real app we'd probably also want
-            -- to listen for page visibility changes to stop orbiting if the user
-            -- switches to a different tab or something
-            Sub.batch
-                [ Browser.Events.onMouseMove decodeMouseMove
-                , Browser.Events.onMouseUp (Decode.succeed MouseUp)
-                ]
+    else
+        -- If we're not currently orbiting, just listen for mouse down events
+        -- to start orbiting
+        Sub.batch
+            [ if model.animate then
+                Time.every 50 (always RotateCamera)
 
-          else
-            -- If we're not currently orbiting, just listen for mouse down events
-            -- to start orbiting
-            Browser.Events.onMouseDown (Decode.succeed MouseDown)
-        ]
+              else
+                Sub.none
+            , Browser.Events.onMouseDown (Decode.succeed MouseDown)
+            ]
 
 
 renderCsg trianglesList =
@@ -816,6 +821,14 @@ view model =
                     ]
                     []
                 , Html.label [ Attrs.for "axis" ] [ Html.text "Axis" ]
+                , Html.input
+                    [ Attrs.checked model.animate
+                    , Attrs.type_ "checkbox"
+                    , Attrs.id "animation"
+                    , Events.onClick ToggleAnimation
+                    ]
+                    []
+                , Html.label [ Attrs.for "animation" ] [ Html.text "Animate" ]
                 ]
             , Html.span
                 [ Attrs.style "padding-right" "24px"

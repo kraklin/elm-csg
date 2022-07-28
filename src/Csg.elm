@@ -11,7 +11,8 @@ module Csg exposing
 
 import BspTree exposing (Face)
 import Color exposing (Color)
-import Csg.PlaneBased as PlaneBased exposing (PlaneBasedFace)
+import Csg.PlaneBased as PlaneBasedFace exposing (Shape)
+import Csg.PlaneBased.Face as PlaneBasedFace exposing (PlaneBasedFace)
 import Csg.Shape3d exposing (Shape3d)
 import Dict exposing (Dict)
 import Direction3d
@@ -173,14 +174,14 @@ toTriangularMeshGroupedByColor shape =
 -- Plane based CSG
 
 
-toPlaneBased : Shape3d c -> List PlaneBasedFace
+toPlaneBased : Shape3d c -> Shape
 toPlaneBased shape =
     shape
         |> Csg.Shape3d.toFaces
-        |> List.filterMap PlaneBased.fromFace
+        |> List.filterMap PlaneBasedFace.fromFace
 
 
-planeBasedTriangularMesh : List PlaneBasedFace -> TriangularMesh (Vertex c)
+planeBasedTriangularMesh : Shape -> TriangularMesh (Vertex c)
 planeBasedTriangularMesh planeBasedFaces =
     let
         toVertex face point =
@@ -196,12 +197,12 @@ planeBasedTriangularMesh planeBasedFaces =
                 |> TriangularMesh.fan (toVertex face (NonEmpty.head face.points))
     in
     planeBasedFaces
-        |> List.filterMap PlaneBased.toFace
+        |> List.filterMap PlaneBasedFace.toFace
         |> List.map toFan
         |> TriangularMesh.combine
 
 
-planeBasedTriangularMeshToLineSegment : List PlaneBasedFace -> List (LineSegment3d Length.Meters coordinates)
+planeBasedTriangularMeshToLineSegment : Shape -> List (LineSegment3d Length.Meters coordinates)
 planeBasedTriangularMeshToLineSegment faces =
     let
         withNormals =
@@ -233,7 +234,7 @@ planeBasedTriangularMeshToLineSegment faces =
                    )
     in
     faces
-        |> List.filterMap PlaneBased.toFace
+        |> List.filterMap PlaneBasedFace.toFace
         |> List.map facesToTriangles
         |> List.concat
         |> List.map (.vertices >> triangleSegments)

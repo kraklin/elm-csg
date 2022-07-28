@@ -19,7 +19,13 @@ type alias PlaneBasedFace =
 
 
 type alias PlaneEquation =
-    { a : Float, b : Float, c : Float, d : Float }
+    { a : Float
+    , b : Float
+    , c : Float
+    , d : Float
+    , originPoint :
+        { x : Float, y : Float, z : Float }
+    }
 
 
 type alias NonEmptyTriplet t =
@@ -178,10 +184,13 @@ fromPlane3d plane =
         inMicrons =
             Length.inMicrons >> ceiling >> toFloat
 
+        ( x, y, z ) =
+            Plane3d.originPoint plane |> (\point -> ( Point3d.xCoordinate point |> inMicrons, Point3d.yCoordinate point |> inMicrons, Point3d.zCoordinate point |> inMicrons ))
+
         d =
-            Plane3d.originPoint plane |> (\point -> -(a * (Point3d.xCoordinate point |> inMicrons) + b * (Point3d.yCoordinate point |> inMicrons) + c * (Point3d.zCoordinate point |> inMicrons)))
+            -(a * x + b * y + c * z)
     in
-    { a = a, b = b, c = c, d = d }
+    { a = a, b = b, c = c, d = d, originPoint = { x = x, y = y, z = z } }
 
 
 det2 : Float -> Float -> Float -> Float -> Float
@@ -235,6 +244,19 @@ areCoincident p q =
         && (det2 p.a p.c q.a q.c == 0)
         && (det2 p.b p.d q.b q.d == 0)
         && (det2 p.a p.d q.a q.d == 0)
+
+
+flipNormal plane =
+    let
+        { x, y, z } =
+            plane.originPoint
+    in
+    { plane
+        | a = -plane.a
+        , b = -plane.b
+        , c = -plane.c
+        , d = -((-plane.a * x) + (-plane.b * y) + (-plane.c * z))
+    }
 
 
 splitByPlane : PlaneEquation -> PlaneBasedFace -> Maybe PlaneBasedFace

@@ -206,7 +206,7 @@ planeBasedTriangularMeshToLineSegment : Shape -> List (LineSegment3d Length.Mete
 planeBasedTriangularMeshToLineSegment faces =
     let
         withNormals =
-            True
+            False
 
         centroid : ( Vertex c, Vertex c, Vertex c ) -> Point3d Meters c
         centroid ( v1, v2, v3 ) =

@@ -14,14 +14,22 @@ type alias Shape =
     List PlaneBasedFace
 
 
-splitByPlane : Plane3d Meters c -> Shape -> Shape
+splitByPlane : Plane3d Meters c -> Shape -> ( Shape, Shape )
 splitByPlane splittingPlane faces =
     let
         plane =
             PlaneBasedFace.fromPlane3d splittingPlane
     in
-    faces
+    ( faces
         |> List.filterMap (PlaneBasedFace.splitByPlane plane)
+    , faces
+        |> List.filterMap (PlaneBasedFace.splitByPlane (PlaneBasedFace.flipNormal plane))
+    )
+
+
+mergeShapes : ( Shape, Shape ) -> Shape
+mergeShapes ( a, b ) =
+    a ++ b
 
 
 

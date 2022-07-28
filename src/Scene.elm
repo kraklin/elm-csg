@@ -14,6 +14,7 @@ import Csg
 import Csg.PlaneBased as PlaneBased
 import Csg.Shape3d as CsgShape
 import Direction3d
+import Duration
 import Html
 import Html.Attributes as Attrs
 import Html.Events as Events
@@ -29,6 +30,7 @@ import Quantity exposing (Quantity)
 import Scene3d
 import Scene3d.Material as Material
 import Scene3d.Mesh as Mesh exposing (Mesh)
+import Time
 import Triangle3d
 import Vector3d
 import Viewpoint3d
@@ -50,6 +52,7 @@ type alias Model =
     , showAxis : Bool
     , showLines : Bool
     , triCount : Int
+    , animate : Bool
     }
 
 
@@ -58,6 +61,7 @@ type Msg
     | MouseUp
     | MouseWheel Float
     | MouseMove (Quantity Float Pixels) (Quantity Float Pixels)
+    | RotateCamera
     | PlanePositionChanged String
     | ToggleLines
     | ToggleAxis
@@ -75,13 +79,14 @@ init () =
             Length.meters 10
 
         splitBy =
-            identity
+            --identity
+            PlaneBased.splitByPlane (Plane3d.through (Point3d.meters -0.3 -0.3 -0.2) (Direction3d.xz (Angle.degrees 60)))
 
-        --PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.2 0.2 0.2) (Direction3d.xz (Angle.degrees 45)))
         --PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.4 0.4 0.4) Direction3d.negativeZ)
         -->> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.2 0.2 0.2) Direction3d.z)
         planeBased =
-            PlaneBased.cube (Length.meters 1)
+            --PlaneBased.cube (Length.meters 1)
+            PlaneBased.sphere
 
         --CsgShape.cube (Length.meters 1)
         --CsgShape.sphere (Length.meters 1)
@@ -91,16 +96,34 @@ init () =
         mesh =
             planeBased
                 |> splitBy
-                |> Csg.planeBasedTriangularMesh
-                |> Mesh.indexedFaces
-                |> Scene3d.mesh (Material.metal { baseColor = Color.gray, roughness = 0.6 })
+                |> (\( min, mout ) ->
+                        [ min
+                            |> Csg.planeBasedTriangularMesh
+                            |> Mesh.indexedFaces
+                            |> Scene3d.mesh (Material.metal { baseColor = Color.gray, roughness = 0.6 })
+                        , mout
+                            |> Csg.planeBasedTriangularMesh
+                            |> Mesh.indexedFaces
+                            |> Scene3d.mesh (Material.metal { baseColor = Color.red, roughness = 0.6 })
+                        ]
+                            |> Scene3d.group
+                   )
 
         lines =
             planeBased
                 |> splitBy
-                |> Csg.planeBasedTriangularMeshToLineSegment
-                |> Mesh.lineSegments
-                |> Scene3d.mesh (Material.color Color.black)
+                |> (\( min, mout ) ->
+                        [ min
+                            |> Csg.planeBasedTriangularMeshToLineSegment
+                            |> Mesh.lineSegments
+                            |> Scene3d.mesh (Material.color Color.black)
+                        , mout
+                            |> Csg.planeBasedTriangularMeshToLineSegment
+                            |> Mesh.lineSegments
+                            |> Scene3d.mesh (Material.color Color.red)
+                        ]
+                            |> Scene3d.group
+                   )
 
         triCount =
             csg |> Csg.toTriangles |> List.length
@@ -108,6 +131,7 @@ init () =
     ( { azimuth = Angle.degrees -60
       , elevation = Angle.degrees 30
       , orbiting = False
+      , animate = True
       , cameraDistance = cameraDistance
       , clipPlanePosition = -0.5
       , csg = csg
@@ -163,6 +187,13 @@ update message model =
             else
                 ( model, Cmd.none )
 
+        RotateCamera ->
+            let
+                rotationRate =
+                    Angle.degrees 20 |> Quantity.per Duration.second
+            in
+            ( { model | azimuth = model.azimuth |> Quantity.minus (Quantity.at rotationRate (Duration.milliseconds 50)) }, Cmd.none )
+
         MouseWheel dy ->
             ( { model
                 | cameraDistance =
@@ -195,20 +226,27 @@ decodeMouseMove =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    if model.orbiting then
-        -- If we're currently orbiting, listen for mouse moves and mouse button
-        -- up events (to stop orbiting); in a real app we'd probably also want
-        -- to listen for page visibility changes to stop orbiting if the user
-        -- switches to a different tab or something
-        Sub.batch
-            [ Browser.Events.onMouseMove decodeMouseMove
-            , Browser.Events.onMouseUp (Decode.succeed MouseUp)
-            ]
+    Sub.batch
+        [ if model.animate then
+            Time.every 50 (always RotateCamera)
 
-    else
-        -- If we're not currently orbiting, just listen for mouse down events
-        -- to start orbiting
-        Browser.Events.onMouseDown (Decode.succeed MouseDown)
+          else
+            Sub.none
+        , if model.orbiting then
+            -- If we're currently orbiting, listen for mouse moves and mouse button
+            -- up events (to stop orbiting); in a real app we'd probably also want
+            -- to listen for page visibility changes to stop orbiting if the user
+            -- switches to a different tab or something
+            Sub.batch
+                [ Browser.Events.onMouseMove decodeMouseMove
+                , Browser.Events.onMouseUp (Decode.succeed MouseUp)
+                ]
+
+          else
+            -- If we're not currently orbiting, just listen for mouse down events
+            -- to start orbiting
+            Browser.Events.onMouseDown (Decode.succeed MouseDown)
+        ]
 
 
 renderCsg trianglesList =

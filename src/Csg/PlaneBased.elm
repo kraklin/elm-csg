@@ -2,6 +2,7 @@ module Csg.PlaneBased exposing (..)
 
 import Angle
 import Axis3d
+import Csg.PlaneBased.BspTree as BspTree exposing (BspTree)
 import Csg.PlaneBased.Face as PlaneBasedFace exposing (PlaneBasedFace)
 import Length exposing (Length, Meters)
 import List.Extra as List
@@ -11,7 +12,17 @@ import Quantity
 
 
 type alias Shape =
-    List PlaneBasedFace
+    BspTree
+
+
+toFaces : Shape -> List PlaneBasedFace
+toFaces =
+    BspTree.toFaces
+
+
+toShape : List PlaneBasedFace -> Shape
+toShape =
+    BspTree.build
 
 
 splitByPlane : Plane3d Meters c -> Shape -> ( Shape, Shape )
@@ -29,11 +40,13 @@ splitByPlane splittingPlane faces =
                     acc
     in
     faces
+        |> BspTree.toFaces
         |> List.map (PlaneBasedFace.splitByPlane plane)
         |> List.foldl (\{ inside, outside } ( inAcc, outAcc ) -> ( handle inside inAcc, handle outside outAcc )) ( [], [] )
+        |> Tuple.mapBoth BspTree.build BspTree.build
 
 
-mergeShapes : ( Shape, Shape ) -> Shape
+mergeShapes : ( List PlaneBasedFace, List PlaneBasedFace ) -> List PlaneBasedFace
 mergeShapes ( a, b ) =
     a ++ b
 
@@ -98,6 +111,7 @@ cuboid { width, height, depth } =
     in
     [ front, back, top, bottom, left, right ]
         |> List.filterMap identity
+        |> BspTree.build
 
 
 cube : Length -> Shape
@@ -197,4 +211,7 @@ sphere =
                         PlaneBasedFace.fromPoints [ i1, i2, i3 ]
                     )
     in
-    northCap ++ middle ++ southCap
+    northCap
+        ++ middle
+        ++ southCap
+        |> BspTree.build

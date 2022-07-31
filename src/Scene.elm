@@ -82,19 +82,19 @@ init () =
 
         splitBy =
             --identity
-            PlaneBased.splitByPlane (Plane3d.through (Point3d.meters -0.3 -0.3 -0.2) (Direction3d.xz (Angle.degrees 60)))
+            PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.3 0.3 0.2) (Direction3d.xz (Angle.degrees 60)))
 
         --PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.4 0.4 0.4) Direction3d.negativeZ)
         -->> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.2 0.2 0.2) Direction3d.z)
         planeBased =
-            --PlaneBased.cube (Length.meters 1)
-            --PlaneBased.sphere
-            --CsgShape.cube (Length.meters 1)
-            --CsgShape.sphere (Length.meters 1)
-            Models.transformationsCube
-                --Models.pawn
-                |> Csg.toPlaneBased
+            PlaneBased.cube (Length.meters 1)
 
+        --PlaneBased.sphere
+        --CsgShape.cube (Length.meters 1)
+        --CsgShape.sphere (Length.meters 1)
+        --Models.transformationsCube
+        --Models.pawn
+        --|> Csg.toPlaneBased
         mesh =
             planeBased
                 |> splitBy

@@ -11,7 +11,7 @@ module Csg exposing
 
 import BspTree exposing (Face)
 import Color exposing (Color)
-import Csg.PlaneBased as PlaneBasedFace exposing (Shape)
+import Csg.PlaneBased as PlaneBased exposing (Shape)
 import Csg.PlaneBased.Face as PlaneBasedFace exposing (PlaneBasedFace)
 import Csg.Shape3d exposing (Shape3d)
 import Dict exposing (Dict)
@@ -179,6 +179,7 @@ toPlaneBased shape =
     shape
         |> Csg.Shape3d.toFaces
         |> List.filterMap PlaneBasedFace.fromFace
+        |> PlaneBased.toShape
 
 
 planeBasedTriangularMesh : Shape -> TriangularMesh (Vertex c)
@@ -197,6 +198,7 @@ planeBasedTriangularMesh planeBasedFaces =
                 |> TriangularMesh.fan (toVertex face (NonEmpty.head face.points))
     in
     planeBasedFaces
+        |> PlaneBased.toFaces
         |> List.filterMap PlaneBasedFace.toFace
         |> List.map toFan
         |> TriangularMesh.combine
@@ -234,6 +236,7 @@ planeBasedTriangularMeshToLineSegment faces =
                    )
     in
     faces
+        |> PlaneBased.toFaces
         |> List.filterMap PlaneBasedFace.toFace
         |> List.map facesToTriangles
         |> List.concat

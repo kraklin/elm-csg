@@ -3,13 +3,14 @@ module Csg.PlaneBased.Face exposing (..)
 import BspTree exposing (Face)
 import Color
 import Direction3d exposing (Direction3d)
+import Html exposing (q)
 import Length exposing (Meters)
 import List.Extra as List
 import List.NonEmpty as NonEmpty
 import Plane3d exposing (Plane3d)
 import Point3d exposing (Point3d)
 import Quantity
-import Vector3d
+import Vector3d exposing (Vector3d)
 
 
 type alias PlaneBasedFace =
@@ -174,16 +175,18 @@ planesIntersection ( p, q, r ) =
         (toMicrons (-(Vector3d.dot m2 v |> Quantity.unwrap) / denom))
 
 
+sanitizeMeters : Float -> Float
+sanitizeMeters value =
+    value * 10 ^ 6 |> ceiling |> toFloat
+
+
 fromPlane3d : Plane3d Meters c -> PlaneEquation
 fromPlane3d plane =
     let
-        sanitize value =
-            value * 10 ^ 6 |> ceiling |> toFloat
-
         ( a, b, c ) =
             Plane3d.normalDirection plane
                 |> Direction3d.components
-                |> (\( a_, b_, c_ ) -> ( sanitize a_, sanitize b_, sanitize c_ ))
+                |> (\( a_, b_, c_ ) -> ( sanitizeMeters a_, sanitizeMeters b_, sanitizeMeters c_ ))
 
         inMicrons =
             Length.inMicrons >> ceiling >> toFloat
@@ -348,3 +351,35 @@ splitByPlane splittingPlane face =
     , outside = clipByPlane (flipNormal splittingPlane) face
     , original = face
     }
+
+
+translatePlane : { x : Float, y : Float, z : Float } -> PlaneEquation -> PlaneEquation
+translatePlane direction { a, b, c, originPoint } =
+    let
+        newOrigin =
+            { x = originPoint.x + direction.x
+            , y = originPoint.y + direction.y
+            , z = originPoint.z + direction.y
+            }
+
+        newD =
+            -(a * newOrigin.x + b * newOrigin.y + c * newOrigin.z)
+    in
+    { a = a, b = b, c = c, d = newD, originPoint = newOrigin }
+
+
+translate : Vector3d Meters c -> PlaneBasedFace -> PlaneBasedFace
+translate vector { boundingPlanes, supportPlane } =
+    let
+        translateVector =
+            Vector3d.components vector |> (\( x, y, z ) -> { x = Length.inMeters x |> sanitizeMeters, y = Length.inMeters y |> sanitizeMeters, z = Length.inMeters z |> sanitizeMeters })
+
+        newBoundingPlanes ( ( p, q, r ), rest ) =
+            ( ( translatePlane translateVector p
+              , translatePlane translateVector q
+              , translatePlane translateVector r
+              )
+            , List.map (translatePlane translateVector) rest
+            )
+    in
+    { boundingPlanes = newBoundingPlanes boundingPlanes, supportPlane = translatePlane translateVector supportPlane }

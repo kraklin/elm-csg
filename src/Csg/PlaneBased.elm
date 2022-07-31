@@ -9,6 +9,7 @@ import List.Extra as List
 import Plane3d exposing (Plane3d)
 import Point3d
 import Quantity
+import Vector3d exposing (Vector3d)
 
 
 type alias Shape =
@@ -215,3 +216,8 @@ sphere =
         ++ middle
         ++ southCap
         |> BspTree.build
+
+
+translateBy : Vector3d Meters c -> BspTree -> BspTree
+translateBy vector tree =
+    BspTree.mapFaces (PlaneBasedFace.translate vector) tree

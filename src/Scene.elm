@@ -88,6 +88,7 @@ init () =
         -->> PlaneBased.splitByPlane (Plane3d.through (Point3d.meters 0.2 0.2 0.2) Direction3d.z)
         planeBased =
             PlaneBased.cube (Length.meters 1)
+                |> PlaneBased.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
 
         --PlaneBased.sphere
         --CsgShape.cube (Length.meters 1)

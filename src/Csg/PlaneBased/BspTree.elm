@@ -71,3 +71,22 @@ insert face tree =
                             |> handleOutside face.supportPlane outside
                             |> Node
                    )
+
+
+mapFaces : (PlaneBasedFace -> PlaneBasedFace) -> BspTree -> BspTree
+mapFaces f tree =
+    let
+        traverse t =
+            case t of
+                Empty ->
+                    Empty
+
+                Node nodeData ->
+                    Node
+                        { nodeData
+                            | face = f nodeData.face
+                            , inside = traverse nodeData.inside
+                            , outside = traverse nodeData.outside
+                        }
+    in
+    traverse tree

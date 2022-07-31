@@ -1,11 +1,12 @@
 module Csg.PlaneBased.BspTree exposing (..)
 
-import Csg.PlaneBased.Face as PlaneBasedFace exposing (PlaneBasedFace, PlaneEquation)
+import Csg.PlaneBased.Face as PlaneBasedFace exposing (PlaneBasedFace)
+import Csg.PlaneBased.Plane exposing (Plane)
 
 
 type BspTree
     = Empty
-    | Node { face : PlaneBasedFace, plane : PlaneEquation, inside : BspTree, outside : BspTree }
+    | Node { face : PlaneBasedFace, plane : Plane, inside : BspTree, outside : BspTree }
 
 
 emptyTree : BspTree

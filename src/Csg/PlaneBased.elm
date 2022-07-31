@@ -4,6 +4,7 @@ import Angle
 import Axis3d
 import Csg.PlaneBased.BspTree as BspTree exposing (BspTree)
 import Csg.PlaneBased.Face as PlaneBasedFace exposing (PlaneBasedFace)
+import Csg.PlaneBased.Plane as Plane exposing (Plane)
 import Length exposing (Length, Meters)
 import List.Extra as List
 import Plane3d exposing (Plane3d)
@@ -30,7 +31,7 @@ splitByPlane : Plane3d Meters c -> Shape -> ( Shape, Shape )
 splitByPlane splittingPlane faces =
     let
         plane =
-            PlaneBasedFace.fromPlane3d splittingPlane
+            Plane.fromPlane3d splittingPlane
 
         handle face acc =
             case face of

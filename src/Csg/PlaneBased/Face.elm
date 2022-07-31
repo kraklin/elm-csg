@@ -37,6 +37,10 @@ normalDirection { a, b, c } =
     Direction3d.from Point3d.origin (Point3d.xyz (Length.microns a) (Length.microns b) (Length.microns c))
 
 
+type alias SplitResult =
+    { inside : Maybe PlaneBasedFace, outside : Maybe PlaneBasedFace, original : PlaneBasedFace }
+
+
 toFace : PlaneBasedFace -> Maybe (Face c)
 toFace planebased =
     let
@@ -259,8 +263,8 @@ flipNormal plane =
     }
 
 
-splitByPlane : PlaneEquation -> PlaneBasedFace -> Maybe PlaneBasedFace
-splitByPlane splittingPlane face =
+clipByPlane : PlaneEquation -> PlaneBasedFace -> Maybe PlaneBasedFace
+clipByPlane splittingPlane face =
     let
         boundingPlanesCandidates planes =
             planes
@@ -336,3 +340,11 @@ splitByPlane splittingPlane face =
                         _ ->
                             Nothing
                )
+
+
+splitByPlane : PlaneEquation -> PlaneBasedFace -> SplitResult
+splitByPlane splittingPlane face =
+    { inside = clipByPlane splittingPlane face
+    , outside = clipByPlane (flipNormal splittingPlane) face
+    , original = face
+    }

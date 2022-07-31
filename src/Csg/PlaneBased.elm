@@ -19,12 +19,18 @@ splitByPlane splittingPlane faces =
     let
         plane =
             PlaneBasedFace.fromPlane3d splittingPlane
+
+        handle face acc =
+            case face of
+                Just f ->
+                    f :: acc
+
+                Nothing ->
+                    acc
     in
-    ( faces
-        |> List.filterMap (PlaneBasedFace.splitByPlane plane)
-    , faces
-        |> List.filterMap (PlaneBasedFace.splitByPlane (PlaneBasedFace.flipNormal plane))
-    )
+    faces
+        |> List.map (PlaneBasedFace.splitByPlane plane)
+        |> List.foldl (\{ inside, outside } ( inAcc, outAcc ) -> ( handle inside inAcc, handle outside outAcc )) ( [], [] )
 
 
 mergeShapes : ( Shape, Shape ) -> Shape

@@ -1,7 +1,9 @@
 module Csg.PlaneBased.Face exposing (..)
 
+import Array exposing (Array)
 import BspTree exposing (Face)
 import Color
+import Csg.PlaneBased.CircularArray as CircularArray exposing (CircularArray)
 import Direction3d exposing (Direction3d)
 import Length exposing (Meters)
 import List.Extra as List
@@ -14,8 +16,12 @@ import Vector3d
 
 type alias PlaneBasedFace =
     { supportPlane : PlaneEquation
-    , boundingPlanes : NonEmptyTriplet PlaneEquation
+    , boundingPlanes : CircularArray ( PlaneEquation, Intersection4d )
     }
+
+
+type alias Intersection4d =
+    { x : Float, y : Float, z : Float, e : Float }
 
 
 type alias PlaneEquation =
@@ -44,8 +50,9 @@ type alias SplitResult =
 toFace : PlaneBasedFace -> Maybe (Face c)
 toFace planebased =
     let
-        toPlanesTriplets ( ( p, q, r ), rest ) =
-            (p :: q :: r :: rest)
+        toPlanesTriplets planes =
+            planes
+                |> List.map Tuple.first
                 |> toPairs
                 |> List.filterMap
                     (\pair ->
@@ -71,9 +78,16 @@ toFace planebased =
                 _ ->
                     Nothing
     in
-    toPlanesTriplets planebased.boundingPlanes
+    planebased.boundingPlanes
+        |> CircularArray.toList
+        |> toPlanesTriplets
         |> List.map planesIntersection
         |> toFace_ planebased.supportPlane
+
+
+withIntersectionPoints p q r rest =
+    CircularArray.fromList p (q :: r :: rest)
+        |> CircularArray.map (\plane -> ( plane, { x = 0, y = 0, z = 0, e = 0 } ))
 
 
 fromPoints : List (Point3d Meters c) -> Maybe PlaneBasedFace
@@ -90,34 +104,33 @@ fromPoints points =
         supportPoint plane p =
             Point3d.translateIn (Plane3d.normalDirection plane) (Length.meters 1) p
     in
-    case supportPlane of
-        Just plane ->
-            points
-                |> toPairs
-                |> (\points_ ->
-                        points_
-                            |> List.filterMap
-                                (\p ->
-                                    case p of
-                                        [ v0, v1 ] ->
-                                            Plane3d.throughPoints v0 v1 (supportPoint plane v1)
-                                                |> Maybe.map fromPlane3d
+    supportPlane
+        |> Maybe.andThen
+            (\plane ->
+                points
+                    |> toPairs
+                    |> (\points_ ->
+                            points_
+                                |> List.filterMap
+                                    (\p ->
+                                        case p of
+                                            [ v0, v1 ] ->
+                                                Plane3d.throughPoints v0 v1 (supportPoint plane v1)
+                                                    |> Maybe.map fromPlane3d
 
-                                        _ ->
-                                            Nothing
-                                )
-                   )
-                |> (\planes ->
-                        case planes of
-                            first :: second :: third :: rest ->
-                                Just { boundingPlanes = ( ( first, second, third ), rest ), supportPlane = fromPlane3d plane }
+                                            _ ->
+                                                Nothing
+                                    )
+                       )
+                    |> (\planes ->
+                            case planes of
+                                p :: q :: r :: rest ->
+                                    Just { boundingPlanes = withIntersectionPoints p q r rest, supportPlane = fromPlane3d plane }
 
-                            _ ->
-                                Nothing
-                   )
-
-        Nothing ->
-            Nothing
+                                _ ->
+                                    Nothing
+                       )
+            )
 
 
 fromFace : Face c -> Maybe PlaneBasedFace
@@ -177,13 +190,10 @@ planesIntersection ( p, q, r ) =
 fromPlane3d : Plane3d Meters c -> PlaneEquation
 fromPlane3d plane =
     let
-        sanitize value =
-            value * 10 ^ 6 |> ceiling |> toFloat
-
         ( a, b, c ) =
             Plane3d.normalDirection plane
                 |> Direction3d.components
-                |> (\( a_, b_, c_ ) -> ( sanitize a_, sanitize b_, sanitize c_ ))
+                |> (\( a_, b_, c_ ) -> ( a_, b_, c_ ))
 
         inMicrons =
             Length.inMicrons >> ceiling >> toFloat
@@ -193,6 +203,9 @@ fromPlane3d plane =
 
         d =
             -(a * x + b * y + c * z)
+
+        intersection4d =
+            { x = 0, y = 0, z = 0, e = 0 }
     in
     { a = a, b = b, c = c, d = d, originPoint = { x = x, y = y, z = z } }
 
@@ -283,13 +296,16 @@ clipByPlane splittingPlane face =
         outputPlane s bPlanes =
             let
                 classifyPrev =
-                    orientation ( s, bPlanes.prev2, bPlanes.prev ) splittingPlane
+                    orientation ( s, Tuple.first bPlanes.prev2, Tuple.first bPlanes.prev ) splittingPlane
 
                 classifyCurr =
-                    orientation ( s, bPlanes.prev, bPlanes.curr ) splittingPlane
+                    orientation ( s, Tuple.first bPlanes.prev, Tuple.first bPlanes.curr ) splittingPlane
 
                 classifyNext =
-                    orientation ( s, bPlanes.curr, bPlanes.next ) splittingPlane
+                    orientation ( s, Tuple.first bPlanes.curr, Tuple.first bPlanes.next ) splittingPlane
+
+                splittingPlaneIntersection =
+                    { x = 0, y = 0, z = 0, e = 0 }
             in
             case ( compare classifyPrev 0, compare classifyCurr 0, compare classifyNext 0 ) of
                 ( _, GT, _ ) ->
@@ -299,7 +315,7 @@ clipByPlane splittingPlane face =
                     Just [ bPlanes.curr ]
 
                 ( _, EQ, GT ) ->
-                    Just [ splittingPlane, bPlanes.curr ]
+                    Just [ ( splittingPlane, splittingPlaneIntersection ), bPlanes.curr ]
 
                 ( _, EQ, EQ ) ->
                     Nothing
@@ -308,16 +324,13 @@ clipByPlane splittingPlane face =
                     Nothing
 
                 ( _, LT, GT ) ->
-                    Just [ splittingPlane, bPlanes.curr ]
+                    Just [ ( splittingPlane, splittingPlaneIntersection ), bPlanes.curr ]
 
                 ( _, LT, EQ ) ->
                     Nothing
 
                 ( _, LT, LT ) ->
                     Nothing
-
-        tripletToList ( ( p, q, r ), rest ) =
-            p :: q :: r :: rest
     in
     if areCoincident splittingPlane face.supportPlane then
         if areSimilaryOriented splittingPlane face.supportPlane then
@@ -328,14 +341,14 @@ clipByPlane splittingPlane face =
 
     else
         face.boundingPlanes
-            |> tripletToList
+            |> CircularArray.toList
             |> boundingPlanesCandidates
             |> List.filterMap (outputPlane face.supportPlane)
             |> List.concat
             |> (\planes ->
                     case planes of
-                        p :: q :: r :: rest ->
-                            Just { face | boundingPlanes = ( ( p, q, r ), rest ) }
+                        p :: rest ->
+                            Just { face | boundingPlanes = CircularArray.fromList p rest }
 
                         _ ->
                             Nothing

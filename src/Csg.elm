@@ -3,7 +3,7 @@ module Csg exposing
     , toLinesAndNormals
     , toTriangles
     , toTriangularMesh
-    , toTriangularMeshGroupedByColor
+    , toTriangularMeshGroupedByTag
     )
 
 import BspTree exposing (Face)
@@ -30,14 +30,14 @@ type alias Vertex coordinates =
     }
 
 
-type alias Triangle c =
+type alias Triangle tag c =
     { vertices : ( Vertex c, Vertex c, Vertex c )
-    , color : Color
+    , tag : Maybe tag
     }
 
 
-facesToTriangles : Face coordinates -> List (Triangle coordinates)
-facesToTriangles ({ normalDirection, color } as face) =
+facesToTriangles : Face tag coordinates -> List (Triangle tag coordinates)
+facesToTriangles ({ normalDirection, tag } as face) =
     let
         withNormal ( v1, v2, v3 ) =
             ( { position = v1, normal = Direction3d.toVector normalDirection }
@@ -50,7 +50,7 @@ facesToTriangles ({ normalDirection, color } as face) =
             rest
                 |> List.foldl
                     (\pNext { pPrevious, triangles } ->
-                        { pPrevious = pNext, triangles = { vertices = withNormal ( p1, pPrevious, pNext ), color = color } :: triangles }
+                        { pPrevious = pNext, triangles = { vertices = withNormal ( p1, pPrevious, pNext ), tag = tag } :: triangles }
                     )
                     { pPrevious = p2, triangles = [] }
                 |> .triangles
@@ -59,19 +59,19 @@ facesToTriangles ({ normalDirection, color } as face) =
             []
 
 
-toTriangles : Shape3d coordinates -> List (Triangle coordinates)
+toTriangles : Shape3d tag coordinates -> List (Triangle tag coordinates)
 toTriangles shape =
     Csg.Shape3d.toFaces shape
         |> List.map facesToTriangles
         |> List.concat
 
 
-toLineSegments : Shape3d coordinates -> List (LineSegment3d Meters coordinates)
+toLineSegments : Shape3d tag coordinates -> List (LineSegment3d Meters coordinates)
 toLineSegments =
     toLinesAndNormals False
 
 
-toLinesAndNormals : Bool -> Shape3d coordinates -> List (LineSegment3d Length.Meters coordinates)
+toLinesAndNormals : Bool -> Shape3d tag coordinates -> List (LineSegment3d Length.Meters coordinates)
 toLinesAndNormals withNormals shape =
     let
         centroid : ( Vertex c, Vertex c, Vertex c ) -> Point3d Meters c
@@ -106,7 +106,7 @@ toLinesAndNormals withNormals shape =
         |> List.concat
 
 
-toTriangularMesh : Shape3d coordinates -> TriangularMesh (Vertex coordinates)
+toTriangularMesh : Shape3d tag coordinates -> TriangularMesh (Vertex coordinates)
 toTriangularMesh shape =
     let
         toVertex face point =
@@ -126,8 +126,8 @@ toTriangularMesh shape =
         |> TriangularMesh.combine
 
 
-toTriangularMeshGroupedByColor : Shape3d coordinates -> List ( TriangularMesh (Vertex coordinates), Color )
-toTriangularMeshGroupedByColor shape =
+toTriangularMeshGroupedByTag : Shape3d tag coordinates -> List ( TriangularMesh (Vertex coordinates), Color )
+toTriangularMeshGroupedByTag shape =
     let
         toVertex face point =
             { position = point
@@ -137,7 +137,7 @@ toTriangularMeshGroupedByColor shape =
             }
 
         toColoredMeshMap :
-            Face c
+            Face tag c
             -> Dict ( Float, Float, Float ) (List (TriangularMesh (Vertex c)))
             -> Dict ( Float, Float, Float ) (List (TriangularMesh (Vertex c)))
         toColoredMeshMap face coloredMeshMap =
@@ -148,7 +148,8 @@ toTriangularMeshGroupedByColor shape =
                         |> TriangularMesh.fan (toVertex face (NonEmpty.head face.points))
 
                 faceColorKey =
-                    Color.toRgba face.color
+                  --TODO: handle tags properly
+                    Color.toRgba Color.yellow
                         |> (\{ red, green, blue } -> ( red, green, blue ))
             in
             if Dict.member faceColorKey coloredMeshMap then
@@ -163,3 +164,6 @@ toTriangularMeshGroupedByColor shape =
         |> List.foldl toColoredMeshMap Dict.empty
         |> Dict.map (\( r, g, b ) meshes -> ( TriangularMesh.combine meshes, Color.rgb r g b ))
         |> Dict.values
+
+
+

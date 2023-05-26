@@ -19,7 +19,6 @@ module BspTree exposing
 import Angle exposing (Angle)
 import Axis3d exposing (Axis3d)
 import Bitwise
-import Color exposing (Color)
 import Dict
 import Direction3d exposing (Direction3d)
 import Length exposing (Meters)
@@ -36,17 +35,17 @@ epsilon =
     1.0e-5
 
 
-type alias Face c =
+type alias Face tag c =
     { points : NonEmpty (Point3d Meters c)
     , normalDirection : Direction3d c
-    , color : Color
+    , tag : Maybe tag
     }
 
 
-type alias NodeData c =
-    { faces : NonEmpty (Face c)
-    , outside : BspTree c
-    , inside : BspTree c
+type alias NodeData tag c =
+    { faces : NonEmpty (Face tag c)
+    , outside : BspTree tag c
+    , inside : BspTree tag c
     , plane : Plane3d Meters c
     }
 
@@ -57,9 +56,9 @@ type Orientation
     | None
 
 
-type alias IntersectionResult c =
-    { outside : Maybe (Face c)
-    , inside : Maybe (Face c)
+type alias IntersectionResult tag c =
+    { outside : Maybe (Face tag c)
+    , inside : Maybe (Face tag c)
     }
 
 
@@ -83,12 +82,12 @@ type alias ClassifiedFace c =
     }
 
 
-type BspTree c
-    = Node (NodeData c)
+type BspTree tag c
+    = Node (NodeData tag c)
     | Empty
 
 
-allPoints : Face c -> List (Point3d Meters c)
+allPoints : Face tag c -> List (Point3d Meters c)
 allPoints { points } =
     NonEmpty.toList points
 
@@ -98,22 +97,22 @@ toFacePoints points =
     NonEmpty.fromList points
 
 
-planeFromFace : Face c -> Plane3d Meters c
+planeFromFace : Face tag c -> Plane3d Meters c
 planeFromFace { points, normalDirection } =
     Plane3d.through (Tuple.first points) normalDirection
 
 
-empty : BspTree c
+empty : BspTree tag c
 empty =
     Empty
 
 
-build : List (Face c) -> BspTree c
+build : List (Face tag c) -> BspTree tag c
 build faces =
     List.foldl insert empty faces
 
 
-toFaces : BspTree c -> List (Face c)
+toFaces : BspTree tag c -> List (Face tag c)
 toFaces tree =
     let
         traverse t =
@@ -127,17 +126,17 @@ toFaces tree =
     traverse tree
 
 
-insert : Face c -> BspTree c -> BspTree c
+insert : Face tag c -> BspTree tag c -> BspTree tag c
 insert face tree =
     let
         facePlane =
             planeFromFace face
 
-        newNode : Plane3d Meters c -> Face c -> NodeData c
+        newNode : Plane3d Meters c -> Face tag c -> NodeData tag c
         newNode plane newFace =
             { faces = ( newFace, [] ), outside = Empty, inside = Empty, plane = plane }
 
-        handleOutside : Plane3d Meters c -> Maybe (Face c) -> NodeData c -> NodeData c
+        handleOutside : Plane3d Meters c -> Maybe (Face tag c) -> NodeData tag c -> NodeData tag c
         handleOutside plane maybeFace node =
             maybeFace
                 |> Maybe.map
@@ -150,7 +149,7 @@ insert face tree =
                     )
                 |> Maybe.withDefault node
 
-        handleInside : Plane3d Meters c -> Maybe (Face c) -> NodeData c -> NodeData c
+        handleInside : Plane3d Meters c -> Maybe (Face tag c) -> NodeData tag c -> NodeData tag c
         handleInside plane maybeFace node =
             maybeFace
                 |> Maybe.map
@@ -177,12 +176,12 @@ insert face tree =
                    )
 
 
-fromPoints : Direction3d coordinates -> Color -> NonEmpty (Point3d Meters coordinates) -> Face coordinates
-fromPoints normalDirection color points =
-    { color = color, points = points, normalDirection = normalDirection }
+fromPoints : Direction3d coordinates -> Maybe tag -> NonEmpty (Point3d Meters coordinates) -> Face tag coordinates
+fromPoints normalDirection tag points =
+    { tag = tag, points = points, normalDirection = normalDirection }
 
 
-mapFaces : (Face c -> Face c) -> BspTree c -> BspTree c
+mapFaces : (Face tag c -> Face tag c) -> BspTree tag c -> BspTree tag c
 mapFaces fn tree =
     let
         traverse t =
@@ -201,13 +200,13 @@ mapFaces fn tree =
     traverse tree
 
 
-translate : Vector3d Meters c -> BspTree c -> BspTree c
+translate : Vector3d Meters c -> BspTree tag c -> BspTree tag c
 translate vector tree =
     let
         translateFace f =
             f.points
                 |> NonEmpty.map (Point3d.translateBy vector)
-                |> fromPoints f.normalDirection f.color
+                |> fromPoints f.normalDirection f.tag
     in
     case tree of
         Empty ->
@@ -223,13 +222,13 @@ translate vector tree =
                 }
 
 
-rotateAround : Axis3d Meters c -> Angle -> BspTree c -> BspTree c
+rotateAround : Axis3d Meters c -> Angle -> BspTree tag c -> BspTree tag c
 rotateAround axis angle tree =
     let
         rotateFace f =
             f.points
                 |> NonEmpty.map (Point3d.rotateAround axis angle)
-                |> fromPoints (Direction3d.rotateAround axis angle f.normalDirection) f.color
+                |> fromPoints (Direction3d.rotateAround axis angle f.normalDirection) f.tag
     in
     case tree of
         Empty ->
@@ -245,13 +244,13 @@ rotateAround axis angle tree =
                 }
 
 
-scaleAbout : Point3d Meters c -> Float -> BspTree c -> BspTree c
+scaleAbout : Point3d Meters c -> Float -> BspTree tag c -> BspTree tag c
 scaleAbout origin factor tree =
     let
         scaleFace f =
             f.points
                 |> NonEmpty.map (Point3d.scaleAbout origin factor)
-                |> fromPoints f.normalDirection f.color
+                |> fromPoints f.normalDirection f.tag
 
         scalePlane p =
             Plane3d.originPoint p
@@ -272,7 +271,7 @@ scaleAbout origin factor tree =
                 }
 
 
-scaleBy : Vector3d Unitless c -> BspTree c -> BspTree c
+scaleBy : Vector3d Unitless c -> BspTree tag c -> BspTree tag c
 scaleBy vector tree =
     let
         ( xScale, yScale, zScale ) =
@@ -309,11 +308,11 @@ scaleBy vector tree =
                 |> Direction3d.from Point3d.origin
                 |> Maybe.withDefault d
 
-        scaleFace : Face c -> Face c
+        scaleFace : Face tag c -> Face tag c
         scaleFace f =
             f.points
                 |> NonEmpty.map scalePoint
-                |> fromPoints (scaleDirection f.normalDirection) f.color
+                |> fromPoints (scaleDirection f.normalDirection) f.tag
 
         scalePlane : Plane3d Meters c -> Plane3d Meters c
         scalePlane p =
@@ -352,7 +351,7 @@ getOrientation plane face =
         Opposite
 
 
-findInside : Orientation -> BspTree c -> Face c -> List (Face c)
+findInside : Orientation -> BspTree tag c -> Face tag c -> List (Face tag c)
 findInside orientation tree face =
     case tree of
         Empty ->
@@ -363,7 +362,7 @@ findInside orientation tree face =
                 classification =
                     classifyFace nodeData.plane face
 
-                handleInside : Maybe (Face c) -> BspTree c -> List (Face c)
+                handleInside : Maybe (Face tag c) -> BspTree tag c -> List (Face tag c)
                 handleInside maybeFace tree_ =
                     maybeFace
                         |> Maybe.map
@@ -377,7 +376,7 @@ findInside orientation tree face =
                             )
                         |> Maybe.withDefault []
 
-                handleOutside : Maybe (Face c) -> BspTree c -> List (Face c)
+                handleOutside : Maybe (Face tag c) -> BspTree tag c -> List (Face tag c)
                 handleOutside maybeFace tree_ =
                     maybeFace
                         |> Maybe.map
@@ -406,7 +405,7 @@ findInside orientation tree face =
                    )
 
 
-findOutside : Orientation -> BspTree c -> Face c -> List (Face c)
+findOutside : Orientation -> BspTree tag c -> Face tag c -> List (Face tag c)
 findOutside orientation tree face =
     case tree of
         Empty ->
@@ -417,7 +416,7 @@ findOutside orientation tree face =
                 classification =
                     classifyFace nodeData.plane face
 
-                handleInside : Maybe (Face c) -> BspTree c -> List (Face c)
+                handleInside : Maybe (Face tag c) -> BspTree tag c -> List (Face tag c)
                 handleInside maybeFace tree_ =
                     maybeFace
                         |> Maybe.map
@@ -431,7 +430,7 @@ findOutside orientation tree face =
                             )
                         |> Maybe.withDefault []
 
-                handleOutside : Maybe (Face c) -> BspTree c -> List (Face c)
+                handleOutside : Maybe (Face tag c) -> BspTree tag c -> List (Face tag c)
                 handleOutside maybeFace tree_ =
                     maybeFace
                         |> Maybe.map
@@ -460,10 +459,23 @@ findOutside orientation tree face =
                    )
 
 
-invertFaces : List (Face c) -> List (Face c)
+areFacesSame : Face tag c -> Face tag c -> Bool
+areFacesSame faceA faceB =
+    let
+        pointsA =
+            allPoints faceA
+
+        pointsB =
+            allPoints faceB
+    in
+    pointsA
+        |> List.all (\a -> List.member a pointsB)
+
+
+invertFaces : List (Face tag c) -> List (Face tag c)
 invertFaces =
     let
-        invertFace : Face c -> Face c
+        invertFace : Face tag c -> Face tag c
         invertFace f =
             { f
                 | points = NonEmpty.reverse f.points
@@ -519,7 +531,7 @@ combineClasses c1 c2 =
         |> numberToClass
 
 
-classifyFace : Plane3d Meters c -> Face c -> ClassifiedFace c
+classifyFace : Plane3d Meters c -> Face tag c -> ClassifiedFace c
 classifyFace plane face =
     let
         planeNormal =
@@ -556,13 +568,13 @@ classifyFace plane face =
     }
 
 
-splitByPlane : Plane3d Meters c -> Face c -> IntersectionResult c
+splitByPlane : Plane3d Meters c -> Face tag c -> IntersectionResult tag c
 splitByPlane plane face =
     let
         classifiedFace =
             classifyFace plane face
 
-        isOutside : Face c -> Bool
+        isOutside : Face tag c -> Bool
         isOutside face_ =
             face_
                 |> .normalDirection

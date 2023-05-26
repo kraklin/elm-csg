@@ -34,7 +34,7 @@ import Viewpoint3d
 
 
 meshToShow =
-    Models.sphericon
+    Models.pawn
 
 
 type WorldCoordinates
@@ -85,10 +85,10 @@ init () =
     )
 
 
-toSceneEntity : CsgShape.Shape3d WorldCoordinates -> Scene3d.Entity WorldCoordinates
+toSceneEntity : CsgShape.Shape3d Color.Color WorldCoordinates -> Scene3d.Entity WorldCoordinates
 toSceneEntity csg =
     csg
-        |> Csg.toTriangularMeshGroupedByColor
+        |> Csg.toTriangularMeshGroupedByTag
         |> List.map
             (\( mesh, color ) ->
                 mesh
@@ -99,7 +99,7 @@ toSceneEntity csg =
         |> Scene3d.group
 
 
-toWireframe : CsgShape.Shape3d WorldCoordinates -> Scene3d.Entity WorldCoordinates
+toWireframe : CsgShape.Shape3d Color.Color WorldCoordinates -> Scene3d.Entity WorldCoordinates
 toWireframe csg =
     csg
         |> Csg.toLinesAndNormals True

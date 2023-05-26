@@ -9,7 +9,7 @@
     "elm-tooling": "^1.3.0"
   },
   "scripts": {
-    "start": "elm-live tests/Viewer.elm",
+    "start": "elm-live src/Scene.elm",
     "build": "elm make tests/Viewer.elm --output docs/index.html",
     "test": "elm-test-rs",
     "postinstall": "elm-tooling install"

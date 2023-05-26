@@ -27,7 +27,7 @@ allShapes =
     let
         smallCube =
             CsgShape.cube (Length.centimeters 10)
-                |> CsgShape.withColor Color.red
+                |> CsgShape.withTag Color.red
 
         cuboid =
             CsgShape.cuboid
@@ -35,11 +35,11 @@ allShapes =
                 , depth = Length.centimeters 20
                 , height = Length.centimeters 30
                 }
-                |> CsgShape.withColor Color.blue
+                |> CsgShape.withTag Color.blue
 
         cone =
             CsgShape.cone (Length.centimeters 5) (Length.centimeters 20)
-                |> CsgShape.withColor Color.yellow
+                |> CsgShape.withTag Color.yellow
 
         coneWith =
             CsgShape.coneWith
@@ -49,15 +49,15 @@ allShapes =
                 , bottomPoint = Point3d.origin
                 , topPoint = Point3d.xyz Quantity.zero Quantity.zero (Length.centimeters 20)
                 }
-                |> CsgShape.withColor Color.darkGreen
+                |> CsgShape.withTag Color.darkGreen
 
         cylinder =
             CsgShape.cylinder (Length.centimeters 5) (Length.centimeters 20)
-                |> CsgShape.withColor Color.green
+                |> CsgShape.withTag Color.green
 
         smallSphere =
             CsgShape.sphere (Length.centimeters 5)
-                |> CsgShape.withColor Color.purple
+                |> CsgShape.withTag Color.purple
     in
     CsgShape.group
         [ smallCube
@@ -132,13 +132,13 @@ dice =
 
         sphere =
             CsgShape.sphere (Length.centimeters 70)
-                |> CsgShape.withColor Color.blue
+                |> CsgShape.withTag Color.blue
 
         base =
             CsgShape.cube cubeSize
                 |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
                 |> CsgShape.intersectWith sphere
-                |> CsgShape.withColor Color.green
+                |> CsgShape.withTag Color.green
 
         dots =
             CsgShape.group
@@ -157,7 +157,7 @@ dice =
                     |> CsgShape.translateBy (Vector3d.meters 1 0 0)
                 ]
                 |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 0.5)
-                |> CsgShape.withColor Color.white
+                |> CsgShape.withTag Color.white
     in
     dots
         |> CsgShape.subtractFrom base
@@ -192,7 +192,7 @@ sphericon =
                 |> CsgShape.rotateAround Axis3d.z (Angle.degrees 180)
                 |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
             )
-        |> CsgShape.withColor Color.orange
+        |> CsgShape.withTag Color.orange
         --}
 
 
@@ -201,11 +201,11 @@ transformationsCube =
         cube =
             CsgShape.cube (Length.meters 1)
                 |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
-                |> CsgShape.withColor Color.red
+                |> CsgShape.withTag Color.red
 
         sphere =
             CsgShape.sphere (Length.centimeters 70)
-                |> CsgShape.withColor Color.blue
+                |> CsgShape.withTag Color.blue
 
         cylinderY =
             CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters 0 -1 0) (Point3d.meters 0 1 0)
@@ -220,7 +220,7 @@ transformationsCube =
             cylinderX
                 |> CsgShape.unionWith cylinderY
                 |> CsgShape.unionWith cylinderZ
-                |> CsgShape.withColor Color.green
+                |> CsgShape.withTag Color.green
     in
     cylinders
         |> CsgShape.subtractFrom
@@ -239,14 +239,14 @@ debug =
                         |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
                         |> CsgShape.moveUp (Length.centimeters 50)
                     )
-                |> CsgShape.withColor Color.gray
+                |> CsgShape.withTag Color.gray
 
         bust =
             CsgShape.torus (Length.centimeters 22) (Length.centimeters 60)
                 |> CsgShape.moveLeft (Length.centimeters 25)
                 |> CsgShape.subtractFrom
                     (CsgShape.cylinder (Length.centimeters 40) (Length.centimeters 80)
-                        |> CsgShape.withColor Color.black
+                        |> CsgShape.withTag Color.black
                     )
     in
     bust
@@ -262,17 +262,17 @@ torus =
                         |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
                         |> CsgShape.moveUp (Length.centimeters 50)
                     )
-                |> CsgShape.withColor Color.gray
+                |> CsgShape.withTag Color.gray
 
         bust =
             CsgShape.torus (Length.centimeters 20) (Length.centimeters 60)
-                |> CsgShape.withColor Color.white
+                |> CsgShape.withTag Color.white
                 |> CsgShape.scaleBy (Vector3d.unitless 1 1 0.8)
                 |> CsgShape.rotateAround Axis3d.y (Angle.degrees 20)
                 |> CsgShape.moveUp (Length.centimeters 25)
                 |> CsgShape.subtractFrom
                     (CsgShape.cylinder (Length.centimeters 40) (Length.centimeters 80)
-                        |> CsgShape.withColor Color.black
+                        |> CsgShape.withTag Color.black
                     )
     in
     visor
@@ -310,7 +310,7 @@ pawn =
                     (CsgShape.cylinder (Length.centimeters 15) (Length.centimeters 8)
                         |> CsgShape.moveUp (Length.centimeters 4)
                     )
-                |> CsgShape.withColor Color.yellow
+                |> CsgShape.withTag Color.yellow
 
         top =
             CsgShape.torus (Length.centimeters 12) (Length.centimeters 29)
@@ -352,5 +352,5 @@ pawn =
 
 eightPawns =
     pawn
-        |> CsgShape.withColor Color.black
+        |> CsgShape.withTag Color.black
         |> CsgShape.scaleAbout Point3d.origin 2

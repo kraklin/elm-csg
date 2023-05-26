@@ -24,7 +24,7 @@ module Csg.Shape3d exposing
     , torus
     , translateBy
     , unionWith
-    , withColor
+    , withTag
     )
 
 import Angle exposing (Angle)
@@ -39,30 +39,25 @@ import Triangle3d
 import Vector3d exposing (Vector3d)
 
 
-defaultColor : Color
-defaultColor =
-    Color.yellow
-
-
 
 -- Solids construction
 
 
-type Shape3d c
-    = Shape3d (BspTree c)
+type Shape3d tag c
+    = Shape3d (BspTree tag c)
 
 
-toFaces : Shape3d c -> List (Face c)
+toFaces : Shape3d tag c -> List (Face tag c)
 toFaces (Shape3d tree) =
     BspTree.toFaces tree
 
 
-toTree : Shape3d c -> BspTree c
+toTree : Shape3d tag c -> BspTree tag c
 toTree (Shape3d tree) =
     tree
 
 
-toFace : List (Point3d Meters c) -> Maybe (Face c)
+toFace : List (Point3d Meters c) -> Maybe (Face tag c)
 toFace points =
     let
         maybeNormal tri =
@@ -76,14 +71,14 @@ toFace points =
                     (\normal ->
                         Face (NonEmpty.fromCons v1 (v2 :: v3 :: rest))
                             normal
-                            defaultColor
+                            Nothing
                     )
 
         _ ->
             Nothing
 
 
-cuboid : { width : Length, height : Length, depth : Length } -> Shape3d coordinates
+cuboid : { width : Length, height : Length, depth : Length } -> Shape3d tag c
 cuboid { width, height, depth } =
     let
         z =
@@ -137,7 +132,7 @@ cuboid { width, height, depth } =
         |> Shape3d
 
 
-cube : Length -> Shape3d coordinates
+cube : Length -> Shape3d tag c
 cube size =
     cuboid { width = size, height = size, depth = size }
 
@@ -161,7 +156,7 @@ sphereDefaultSettings =
     }
 
 
-sphere : Length -> Shape3d c
+sphere : Length -> Shape3d tag c
 sphere radius =
     sphereWith { sphereDefaultSettings | radius = radius }
 
@@ -170,7 +165,7 @@ sphere radius =
 -- TODO - orientation of top should be Z axis, not Y
 
 
-sphereWith : SphereSettings -> Shape3d c
+sphereWith : SphereSettings -> Shape3d tag c
 sphereWith { slices, stacks, radius } =
     let
         stacks_ =
@@ -201,7 +196,7 @@ sphereWith { slices, stacks, radius } =
                 |> Point3d.rotateAround Axis3d.x (Quantity.multiplyBy (toFloat it) deltaTheta)
                 |> Point3d.rotateAround Axis3d.y (Quantity.multiplyBy (toFloat ip) deltaPhi)
 
-        middle : List (Face c)
+        middle : List (Face tag c)
         middle =
             List.range 1 (stacks_ - 2)
                 |> List.map
@@ -284,7 +279,7 @@ coneDefaultSettings =
 cone :
     Length
     -> Length
-    -> Shape3d c
+    -> Shape3d tag c
 cone radius height =
     coneWith
         { coneDefaultSettings
@@ -295,7 +290,7 @@ cone radius height =
 
 coneWith :
     ConeSettings c
-    -> Shape3d c
+    -> Shape3d tag c
 coneWith { slices, bottomRadius, bottomPoint, topRadius, topPoint } =
     let
         vector =
@@ -409,7 +404,7 @@ coneWith { slices, bottomRadius, bottomPoint, topRadius, topPoint } =
 -- Cylinder
 
 
-cylinder : Length -> Length -> Shape3d c
+cylinder : Length -> Length -> Shape3d tag c
 cylinder radius height =
     coneWith
         { coneDefaultSettings
@@ -419,7 +414,7 @@ cylinder radius height =
         }
 
 
-cylinderFromTo : Length -> Point3d Meters c -> Point3d Meters c -> Shape3d c
+cylinderFromTo : Length -> Point3d Meters c -> Point3d Meters c -> Shape3d tag c
 cylinderFromTo radius start end =
     coneWith
         { coneDefaultSettings
@@ -434,7 +429,7 @@ cylinderFromTo radius start end =
 -- Torus
 
 
-torus : Length -> Length -> Shape3d c
+torus : Length -> Length -> Shape3d tag c
 torus innerRadius outerRadius =
     let
         stacks_ =
@@ -488,6 +483,25 @@ torus innerRadius outerRadius =
                             |> .faces
                             |> List.filterMap identity
                     )
+
+        toFace_ points =
+            let
+                maybeNormal tri =
+                    tri
+                        |> Triangle3d.normalDirection
+            in
+            case points of
+                v1 :: v2 :: v3 :: rest ->
+                    maybeNormal (Triangle3d.from v1 v2 v3)
+                        |> Maybe.map
+                            (\normal ->
+                                Face (NonEmpty.fromCons v1 (v2 :: v3 :: rest))
+                                    normal
+                                    Nothing
+                            )
+
+                _ ->
+                    Nothing
     in
     allCircles
         |> List.concat
@@ -499,7 +513,7 @@ torus innerRadius outerRadius =
 -- Operations
 
 
-intersectWith : Shape3d c -> Shape3d c -> Shape3d c
+intersectWith : Shape3d tag c -> Shape3d tag c -> Shape3d tag c
 intersectWith (Shape3d t1) (Shape3d t2) =
     let
         a =
@@ -519,7 +533,7 @@ intersectWith (Shape3d t1) (Shape3d t2) =
         |> Shape3d
 
 
-unionWith : Shape3d c -> Shape3d c -> Shape3d c
+unionWith : Shape3d tag c -> Shape3d tag c -> Shape3d tag c
 unionWith (Shape3d t1) (Shape3d t2) =
     let
         a =
@@ -539,7 +553,7 @@ unionWith (Shape3d t1) (Shape3d t2) =
         |> Shape3d
 
 
-subtractFrom : Shape3d c -> Shape3d c -> Shape3d c
+subtractFrom : Shape3d tag c -> Shape3d tag c -> Shape3d tag c
 subtractFrom (Shape3d t1) (Shape3d t2) =
     let
         a =
@@ -563,7 +577,7 @@ subtractFrom (Shape3d t1) (Shape3d t2) =
 {-| TODO: bottleneck for combining lots of complicated models
 -- maybe it would be treated in a simple way when the shapes do not overlap..
 -}
-group : List (Shape3d c) -> Shape3d c
+group : List (Shape3d tag c) -> Shape3d tag c
 group csgs =
     csgs
         |> List.foldl (\(Shape3d tree) acc -> BspTree.toFaces tree ++ acc) []
@@ -571,63 +585,63 @@ group csgs =
         |> Shape3d
 
 
-translateBy : Vector3d Meters c -> Shape3d c -> Shape3d c
+translateBy : Vector3d Meters c -> Shape3d tag c -> Shape3d tag c
 translateBy vector shape =
     toTree shape
         |> BspTree.translate vector
         |> Shape3d
 
 
-moveRight : Length -> Shape3d c -> Shape3d c
+moveRight : Length -> Shape3d tag c -> Shape3d tag c
 moveRight distance shape =
     toTree shape
         |> BspTree.translate (Vector3d.xyz distance Quantity.zero Quantity.zero)
         |> Shape3d
 
 
-moveLeft : Length -> Shape3d c -> Shape3d c
+moveLeft : Length -> Shape3d tag c -> Shape3d tag c
 moveLeft distance shape =
     toTree shape
         |> BspTree.translate (Vector3d.xyz (Quantity.negate distance) Quantity.zero Quantity.zero)
         |> Shape3d
 
 
-moveBackward : Length -> Shape3d c -> Shape3d c
+moveBackward : Length -> Shape3d tag c -> Shape3d tag c
 moveBackward distance shape =
     toTree shape
         |> BspTree.translate (Vector3d.xyz Quantity.zero distance Quantity.zero)
         |> Shape3d
 
 
-moveForward : Length -> Shape3d c -> Shape3d c
+moveForward : Length -> Shape3d tag c -> Shape3d tag c
 moveForward distance shape =
     toTree shape
         |> BspTree.translate (Vector3d.xyz Quantity.zero (Quantity.negate distance) Quantity.zero)
         |> Shape3d
 
 
-moveUp : Length -> Shape3d c -> Shape3d c
+moveUp : Length -> Shape3d tag c -> Shape3d tag c
 moveUp distance shape =
     toTree shape
         |> BspTree.translate (Vector3d.xyz Quantity.zero Quantity.zero distance)
         |> Shape3d
 
 
-moveDown : Length -> Shape3d c -> Shape3d c
+moveDown : Length -> Shape3d tag c -> Shape3d tag c
 moveDown distance shape =
     toTree shape
         |> BspTree.translate (Vector3d.xyz Quantity.zero Quantity.zero (Quantity.negate distance))
         |> Shape3d
 
 
-rotateAround : Axis3d Meters c -> Angle -> Shape3d c -> Shape3d c
+rotateAround : Axis3d Meters c -> Angle -> Shape3d tag c -> Shape3d tag c
 rotateAround axis angle shape =
     toTree shape
         |> BspTree.rotateAround axis angle
         |> Shape3d
 
 
-scaleAbout : Point3d Meters c -> Float -> Shape3d c -> Shape3d c
+scaleAbout : Point3d Meters c -> Float -> Shape3d tag c -> Shape3d tag c
 scaleAbout origin factor shape =
     toTree shape
         |> BspTree.scaleAbout origin factor
@@ -638,15 +652,15 @@ scaleAbout origin factor shape =
 -- TODO: needs to be unitless
 
 
-scaleBy : Vector3d Unitless c -> Shape3d c -> Shape3d c
+scaleBy : Vector3d Unitless c -> Shape3d tag c -> Shape3d tag c
 scaleBy vector shape =
     toTree shape
         |> BspTree.scaleBy vector
         |> Shape3d
 
 
-withColor : Color -> Shape3d c -> Shape3d c
-withColor color shape =
+withTag : tag -> Shape3d tag c -> Shape3d tag c
+withTag tag shape =
     toTree shape
-        |> BspTree.mapFaces (\f -> { f | color = color })
+        |> BspTree.mapFaces (\f -> { f | tag = Just tag  })
         |> Shape3d

@@ -43,7 +43,7 @@ type alias Model =
     , orbiting : Bool -- Whether the mouse button is currently down
     , cameraDistance : Length.Length
     , clipPlanePosition : Float
-    , csg : CsgShape.Shape3d WorldCoordinates
+    , csg : CsgShape.Shape3d Color.Color WorldCoordinates
     , mesh : Scene3d.Entity WorldCoordinates
     , lines : Scene3d.Entity WorldCoordinates
     , showAxis : Bool
@@ -62,13 +62,23 @@ type Msg
     | ToggleAxis
 
 
+shape =
+     CsgShape.sphere (Length.meters 1)
+
+
+toLines =
+    Csg.toLineSegments
+        >> Mesh.lineSegments
+        >> Scene3d.mesh (Material.color Color.black)
+
+
 init : () -> ( Model, Cmd Msg )
 init () =
     -- Create a couple of Mesh values containing a single triangle each and
     -- store them in the model
     let
         csg =
-            Models.torus
+            Models.pawn
                 |> CsgShape.scaleAbout Point3d.origin 1
 
         cameraDistance =
@@ -76,7 +86,7 @@ init () =
 
         mesh =
             csg
-                |> Csg.toTriangularMeshGroupedByColor
+                |> Csg.toTriangularMeshGroupedByTag
                 |> List.map
                     (\( mesh_, color ) ->
                         mesh_
@@ -214,36 +224,36 @@ cube =
     --Csg.sphere (Length.meters 0.7)
     CsgShape.cube (Length.meters 1)
         |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
-        |> CsgShape.withColor Color.red
+        |> CsgShape.withTag Color.red
 
 
 cube2 =
     CsgShape.cube (Length.meters 1)
-        |> CsgShape.withColor Color.red
+        |> CsgShape.withTag Color.red
 
 
 cylinderY =
     CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters 0 -1 0) (Point3d.meters 0 1 0)
-        |> CsgShape.withColor Color.purple
+        |> CsgShape.withTag Color.purple
 
 
 cylinderX =
     CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters -1 0 0) (Point3d.meters 1 0 0)
-        |> CsgShape.withColor Color.purple
+        |> CsgShape.withTag Color.purple
 
 
 cylinderZ =
     CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters 0 0 -1) (Point3d.meters 0 0 1)
 
 
-finalCsg : CsgShape.Shape3d WorldCoordinates
+finalCsg : CsgShape.Shape3d Color.Color WorldCoordinates
 finalCsg =
     let
         cylinders =
             cylinderX
                 |> CsgShape.unionWith cylinderY
                 |> CsgShape.unionWith cylinderZ
-                |> CsgShape.withColor Color.green
+                |> CsgShape.withTag Color.green
     in
     cylinders
         --{--
@@ -258,7 +268,7 @@ allShapes =
     let
         smallCube =
             CsgShape.cube (Length.centimeters 10)
-                |> CsgShape.withColor Color.red
+                |> CsgShape.withTag Color.red
 
         cuboid =
             CsgShape.cuboid
@@ -266,11 +276,11 @@ allShapes =
                 , depth = Length.centimeters 20
                 , height = Length.centimeters 30
                 }
-                |> CsgShape.withColor Color.red
+                |> CsgShape.withTag Color.red
 
         cone =
             CsgShape.cone (Length.centimeters 5) (Length.centimeters 20)
-                |> CsgShape.withColor Color.yellow
+                |> CsgShape.withTag Color.yellow
 
         coneWith =
             CsgShape.coneWith
@@ -280,15 +290,15 @@ allShapes =
                 , bottomPoint = Point3d.origin
                 , topPoint = Point3d.xyz Quantity.zero Quantity.zero (Length.centimeters 20)
                 }
-                |> CsgShape.withColor Color.darkGreen
+                |> CsgShape.withTag Color.darkGreen
 
         cylinder =
             CsgShape.cylinder (Length.centimeters 5) (Length.centimeters 20)
-                |> CsgShape.withColor Color.green
+                |> CsgShape.withTag Color.green
 
         smallSphere =
             CsgShape.sphere (Length.centimeters 5)
-                |> CsgShape.withColor Color.purple
+                |> CsgShape.withTag Color.purple
     in
     CsgShape.group
         [ smallCube
@@ -311,7 +321,7 @@ allShapes =
 
 finalCsg4 =
     CsgShape.cube (Length.meters 2)
-        |> CsgShape.withColor Color.yellow
+        |> CsgShape.withTag Color.yellow
         |> CsgShape.scaleBy (Vector3d.unitless 0.4 1 1)
         |> CsgShape.rotateAround Axis3d.y (Angle.degrees -70)
         |> CsgShape.translateBy (Vector3d.meters 0 0 0.7)
@@ -320,7 +330,7 @@ finalCsg4 =
         |> CsgShape.subtractFrom
             (CsgShape.sphere (Length.meters 1)
                 |> CsgShape.scaleBy (Vector3d.unitless 2 1 1)
-                |> CsgShape.withColor Color.green
+                |> CsgShape.withTag Color.green
             )
         |> CsgShape.scaleBy (Vector3d.unitless 0.5 1 1)
 
@@ -382,7 +392,7 @@ finalCsg5 =
                 |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 0.5)
                 |> CsgShape.intersectWith sphere
                 |> CsgShape.translateBy (Vector3d.meters 0.5 0.5 -0.5)
-                |> CsgShape.withColor Color.red
+                |> CsgShape.withTag Color.red
 
         dots =
             CsgShape.group
@@ -400,7 +410,7 @@ finalCsg5 =
                     |> CsgShape.rotateAround Axis3d.x (Angle.degrees -90)
                     |> CsgShape.translateBy (Vector3d.meters 1 0 0)
                 ]
-                |> CsgShape.withColor Color.white
+                |> CsgShape.withTag Color.white
     in
     dots
         |> CsgShape.subtractFrom base
@@ -443,14 +453,14 @@ finalCsg6 =
                     |> CsgShape.rotateAround Axis3d.z (Angle.degrees 180)
                     |> CsgShape.rotateAround Axis3d.y (Angle.degrees 90)
                 ]
-                |> CsgShape.withColor Color.orange
+                |> CsgShape.withTag Color.orange
     in
     CsgShape.group
         [ sphericon
         , sphericon
             |> CsgShape.scaleBy (Vector3d.unitless 1.2 1 0.5)
             |> CsgShape.translateBy (Vector3d.meters 1.2 0 0)
-            |> CsgShape.withColor Color.green
+            |> CsgShape.withTag Color.green
         ]
 
 
@@ -464,7 +474,7 @@ finalCsg6 =
 
 sphere =
     CsgShape.sphere (Length.centimeters 69)
-        |> CsgShape.withColor Color.blue
+        |> CsgShape.withTag Color.blue
 
 
 grid =
@@ -676,7 +686,7 @@ numberToLineSegments num =
 
 finalCsgMesh =
     finalCsg
-        |> Csg.toTriangularMeshGroupedByColor
+        |> Csg.toTriangularMeshGroupedByTag
         |> List.map
             (\( mesh, color ) ->
                 mesh

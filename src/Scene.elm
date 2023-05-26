@@ -71,6 +71,18 @@ toLines =
         >> Mesh.lineSegments
         >> Scene3d.mesh (Material.color Color.black)
 
+tagToComparable tag = 
+          case tag of
+            Just color ->
+                    Color.toRgba color
+                        |> (\{ red, green, blue } -> ( red, green, blue ))
+            Nothing ->
+                    Color.toRgba Color.gray
+                        |> (\{ red, green, blue } -> ( red, green, blue ))
+
+colorFromKey (r, g, b) =
+            Color.rgb r g b
+
 
 init : () -> ( Model, Cmd Msg )
 init () =
@@ -86,12 +98,12 @@ init () =
 
         mesh =
             csg
-                |> Csg.toTriangularMeshGroupedByTag
+                |> Csg.toTriangularMeshGroupedByTag tagToComparable
                 |> List.map
-                    (\( mesh_, color ) ->
+                    (\( mesh_, key ) ->
                         mesh_
                             |> Mesh.indexedFaces
-                            |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0.6 })
+                            |> Scene3d.mesh (Material.metal { baseColor = colorFromKey key, roughness = 0.6 })
                     )
                 |> Scene3d.group
 
@@ -686,12 +698,12 @@ numberToLineSegments num =
 
 finalCsgMesh =
     finalCsg
-        |> Csg.toTriangularMeshGroupedByTag
+        |> Csg.toTriangularMeshGroupedByTag tagToComparable
         |> List.map
-            (\( mesh, color ) ->
+            (\( mesh, key ) ->
                 mesh
                     |> Mesh.indexedFaces
-                    |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0 })
+                    |> Scene3d.mesh (Material.metal { baseColor = colorFromKey key, roughness = 0 })
             )
         |> Scene3d.group
 --}

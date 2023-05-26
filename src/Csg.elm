@@ -126,8 +126,8 @@ toTriangularMesh shape =
         |> TriangularMesh.combine
 
 
-toTriangularMeshGroupedByTag : Shape3d tag coordinates -> List ( TriangularMesh (Vertex coordinates), Color )
-toTriangularMeshGroupedByTag shape =
+toTriangularMeshGroupedByTag : (Maybe tag -> comparable) -> Shape3d tag coordinates -> List ( TriangularMesh (Vertex coordinates), comparable )
+toTriangularMeshGroupedByTag toComparable shape =
     let
         toVertex face point =
             { position = point
@@ -138,8 +138,8 @@ toTriangularMeshGroupedByTag shape =
 
         toColoredMeshMap :
             Face tag c
-            -> Dict ( Float, Float, Float ) (List (TriangularMesh (Vertex c)))
-            -> Dict ( Float, Float, Float ) (List (TriangularMesh (Vertex c)))
+            -> Dict comparable (List (TriangularMesh (Vertex c)))
+            -> Dict comparable (List (TriangularMesh (Vertex c)))
         toColoredMeshMap face coloredMeshMap =
             let
                 newMesh =
@@ -148,9 +148,7 @@ toTriangularMeshGroupedByTag shape =
                         |> TriangularMesh.fan (toVertex face (NonEmpty.head face.points))
 
                 faceColorKey =
-                  --TODO: handle tags properly
-                    Color.toRgba Color.yellow
-                        |> (\{ red, green, blue } -> ( red, green, blue ))
+                    face.tag |> toComparable
             in
             if Dict.member faceColorKey coloredMeshMap then
                 Dict.update faceColorKey
@@ -162,7 +160,7 @@ toTriangularMeshGroupedByTag shape =
     in
     Csg.Shape3d.toFaces shape
         |> List.foldl toColoredMeshMap Dict.empty
-        |> Dict.map (\( r, g, b ) meshes -> ( TriangularMesh.combine meshes, Color.rgb r g b ))
+        |> Dict.map (\key meshes -> ( TriangularMesh.combine meshes, key ))
         |> Dict.values
 
 

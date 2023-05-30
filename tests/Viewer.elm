@@ -34,7 +34,7 @@ import Viewpoint3d
 
 
 meshToShow =
-    Models.pawn
+    CsgShape.geodesicSphere 1 1
 
 
 type WorldCoordinates

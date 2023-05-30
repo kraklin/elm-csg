@@ -317,12 +317,12 @@ pawn =
                 |> CsgShape.moveUp (Length.centimeters 12)
                 |> CsgShape.subtractFrom
                     (CsgShape.cylinder (Length.centimeters 15) (Length.centimeters 20))
-                |> CsgShape.unionWith
+                    |> CsgShape.unionWith
                     (CsgShape.sphereWith
                         { radius =
                             Length.centimeters 8.4
-                        , stacks = 8
-                        , slices = 16
+                        , stacks = 4
+                        , slices = 8
                         }
                         |> CsgShape.rotateAround Axis3d.x (Angle.degrees 90)
                         |> CsgShape.intersectWith
@@ -330,7 +330,7 @@ pawn =
                                 |> CsgShape.moveForward (Length.centimeters 8)
                                 |> CsgShape.moveLeft (Length.centimeters 8)
                             )
-                        |> CsgShape.moveUp (Length.centimeters 20)
+                        |> CsgShape.moveUp (Length.centimeters 19.9)
                     )
                 |> CsgShape.unionWith hat
 
@@ -338,12 +338,13 @@ pawn =
             CsgShape.sphereWith
                 { radius =
                     Length.centimeters 8.4
-                , stacks = 8
-                , slices = 16
+                , stacks = 4
+                , slices = 8
                 }
                 |> CsgShape.rotateAround Axis3d.x (Angle.degrees 90)
                 |> CsgShape.scaleBy (Vector3d.unitless 1 1 1.1)
                 |> CsgShape.moveUp (Length.centimeters 34)
+                |> CsgShape.withTag Color.red
     in
     top
         |> CsgShape.moveUp (Length.centimeters 12)

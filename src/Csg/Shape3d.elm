@@ -6,6 +6,7 @@ module Csg.Shape3d exposing
     , cuboid
     , cylinder
     , cylinderFromTo
+    , geodesicSphere
     , group
     , intersectWith
     , moveBackward
@@ -31,7 +32,9 @@ import Angle exposing (Angle)
 import Axis3d exposing (Axis3d)
 import BspTree exposing (BspTree, Face)
 import Color exposing (Color)
+import Direction3d
 import Length exposing (Length, Meters)
+import List.Extra as List
 import List.NonEmpty as NonEmpty
 import Point3d exposing (Point3d)
 import Quantity exposing (Unitless)
@@ -150,8 +153,8 @@ type alias SphereSettings =
 
 sphereDefaultSettings : SphereSettings
 sphereDefaultSettings =
-    { slices = 32
-    , stacks = 16
+    { slices = 16
+    , stacks = 8
     , radius = Length.meters 0.5
     }
 
@@ -272,7 +275,7 @@ coneDefaultSettings =
     , bottomPoint = Point3d.origin
     , topPoint = Point3d.meters 0 0 1
     , topRadius = Length.meters 0
-    , slices = 16
+    , slices = 8
     }
 
 
@@ -433,10 +436,10 @@ torus : Length -> Length -> Shape3d tag c
 torus innerRadius outerRadius =
     let
         stacks_ =
-            16
+            8
 
         slices_ =
-            16
+            8
 
         deltaOuter =
             Angle.turns (1 / toFloat stacks_)
@@ -507,6 +510,148 @@ torus innerRadius outerRadius =
         |> List.concat
         |> BspTree.build
         |> Shape3d
+
+
+
+-- geodesic sphere
+
+
+goldenRatio : Float
+goldenRatio =
+    (1 + sqrt 5) / 2
+
+
+icosahedron : List (Face tag c)
+icosahedron =
+    let
+        v1 =
+            Point3d.meters 0.850651 0.0 -0.525731
+
+        v2 =
+            Point3d.meters 0.850651 -0.0 0.525731
+
+        v3 =
+            Point3d.meters -0.850651 -0.0 0.525731
+
+        v4 =
+            Point3d.meters -0.850651 0.0 -0.525731
+
+        v5 =
+            Point3d.meters 0.0 -0.525731 0.850651
+
+        v6 =
+            Point3d.meters 0.0 0.525731 0.850651
+
+        v7 =
+            Point3d.meters 0.0 0.525731 -0.850651
+
+        v8 =
+            Point3d.meters 0.0 -0.525731 -0.850651
+
+        v9 =
+            Point3d.meters -0.525731 -0.850651 -0.0
+
+        v10 =
+            Point3d.meters 0.525731 -0.850651 -0.0
+
+        v11 =
+            Point3d.meters 0.525731 0.850651 0.0
+
+        v12 =
+            Point3d.meters -0.525731 0.850651 0.0
+    in
+    [ [ v1, v2, v10 ]
+    , [ v2, v1, v11 ]
+    , [ v7, v1, v8 ]
+    , [ v11, v1, v7 ]
+    , [ v8, v1, v10 ]
+    , [ v6, v5, v2 ]
+    , [ v5, v10, v2 ]
+    , [ v6, v2, v11 ]
+    , [ v3, v4, v9 ]
+    , [ v4, v3, v12 ]
+    , [ v3, v5, v6 ]
+    , [ v5, v3, v9 ]
+    , [ v3, v6, v12 ]
+    , [ v4, v7, v8 ]
+    , [ v7, v4, v12 ]
+    , [ v9, v4, v8 ]
+    , [ v10, v5, v9 ]
+    , [ v12, v6, v11 ]
+    , [ v11, v7, v12 ]
+    , [ v9, v8, v10 ]
+    ]
+        |> List.filterMap toFace
+
+
+
+-- Function to create faces from points.
+
+
+facesFromPoints : List (Point3d Meters coordinates) -> List (Face tag coordinates)
+facesFromPoints vertices =
+    vertices
+        |> List.greedyGroupsOf 3
+        |> List.filterMap toFace
+
+
+
+-- Subdivide each triangle into four smaller triangles.
+
+
+subdivide : Length -> List (Face tag coordinates) -> List (Face tag coordinates)
+subdivide radius faces =
+    let
+        projectToSphere point =
+            Direction3d.from Point3d.origin point
+                |> Maybe.map (\direction -> Point3d.translateIn direction radius Point3d.origin)
+                |> Maybe.withDefault point
+    in
+    faces
+        |> List.concatMap
+            (\face ->
+                case BspTree.allPoints face of
+                    a :: b :: c :: rest ->
+                        let
+                            ab =
+                                Point3d.midpoint a b
+                                    |> projectToSphere
+
+                            bc =
+                                Point3d.midpoint b c
+                                    |> projectToSphere
+
+                            ca =
+                                Point3d.midpoint c a
+                                    |> projectToSphere
+
+                            newPoints =
+                                [ [ projectToSphere a, ab, ca ], [ ab, projectToSphere b, bc ], [ ca, bc, projectToSphere c ], [ ca, ab, bc ] ]
+                        in
+                        newPoints
+                            |> List.filterMap toFace
+
+                    _ ->
+                        []
+            )
+
+
+
+-- Generate a geodesic sphere.
+
+
+geodesicSphere : Length -> Int -> Shape3d tag c
+geodesicSphere radius subdivisions =
+    if subdivisions < 1 then
+        icosahedron
+            |> BspTree.build
+            |> Shape3d
+
+    else
+        List.range 0 subdivisions
+            |> List.foldl (\_ -> subdivide radius) icosahedron
+            |> BspTree.build
+            |> Shape3d
 
 
 
@@ -662,5 +807,5 @@ scaleBy vector shape =
 withTag : tag -> Shape3d tag c -> Shape3d tag c
 withTag tag shape =
     toTree shape
-        |> BspTree.mapFaces (\f -> { f | tag = Just tag  })
+        |> BspTree.mapFaces (\f -> { f | tag = Just tag })
         |> Shape3d

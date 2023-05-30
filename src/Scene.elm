@@ -63,25 +63,32 @@ type Msg
 
 
 shape =
-     CsgShape.sphere (Length.meters 1)
+    CsgShape.geodesicSphere (Length.meters 1) 0
 
 
 toLines =
-    Csg.toLineSegments
-        >> Mesh.lineSegments
-        >> Scene3d.mesh (Material.color Color.black)
+    Csg.toLinesAndNormals True
+        >> List.map
+            (\lineSegment ->
+                lineSegment
+                    |> Scene3d.lineSegment (Material.color Color.black)
+            )
+        >> Scene3d.group
 
-tagToComparable tag = 
-          case tag of
-            Just color ->
-                    Color.toRgba color
-                        |> (\{ red, green, blue } -> ( red, green, blue ))
-            Nothing ->
-                    Color.toRgba Color.gray
-                        |> (\{ red, green, blue } -> ( red, green, blue ))
 
-colorFromKey (r, g, b) =
-            Color.rgb r g b
+tagToComparable tag =
+    case tag of
+        Just color ->
+            Color.toRgba color
+                |> (\{ red, green, blue } -> ( red, green, blue ))
+
+        Nothing ->
+            Color.toRgba Color.gray
+                |> (\{ red, green, blue } -> ( red, green, blue ))
+
+
+colorFromKey ( r, g, b ) =
+    Color.rgb r g b
 
 
 init : () -> ( Model, Cmd Msg )
@@ -90,8 +97,11 @@ init () =
     -- store them in the model
     let
         csg =
-            Models.pawn
-                |> CsgShape.scaleAbout Point3d.origin 1
+            CsgShape.cube (Length.meters 1)
+                |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
+                |> CsgShape.intersectWith
+                    --(CsgShape.cube (Length.meters 1))
+                    (CsgShape.geodesicSphere (Length.meters 0.72) 1)
 
         cameraDistance =
             Length.meters 10
@@ -108,10 +118,7 @@ init () =
                 |> Scene3d.group
 
         lines =
-            csg
-                |> Csg.toLineSegments
-                |> Mesh.lineSegments
-                |> Scene3d.mesh (Material.color Color.black)
+            toLines csg
 
         triCount =
             csg |> Csg.toTriangles |> List.length

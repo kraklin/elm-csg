@@ -13,5 +13,8 @@
     "build": "elm make tests/Viewer.elm --output docs/index.html",
     "test": "elm-test-rs",
     "postinstall": "elm-tooling install"
+  },
+  "dependencies": {
+    "elm-test": "^0.19.1-revision12"
   }
 }

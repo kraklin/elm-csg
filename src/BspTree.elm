@@ -128,51 +128,30 @@ toFaces tree =
 
 insert : Face tag c -> BspTree tag c -> BspTree tag c
 insert face tree =
-    let
-        facePlane =
-            planeFromFace face
-
-        newNode : Plane3d Meters c -> Face tag c -> NodeData tag c
-        newNode plane newFace =
-            { faces = ( newFace, [] ), outside = Empty, inside = Empty, plane = plane }
-
-        handleOutside : Plane3d Meters c -> Maybe (Face tag c) -> NodeData tag c -> NodeData tag c
-        handleOutside plane maybeFace node =
-            case maybeFace of
-                Just newFace ->
-                    if node.outside == Empty then
-                        { node | outside = Node <| newNode plane newFace }
-
-                    else
-                        { node | outside = insert newFace node.outside }
-
-                Nothing ->
-                    node
-
-        handleInside : Plane3d Meters c -> Maybe (Face tag c) -> NodeData tag c -> NodeData tag c
-        handleInside plane maybeFace node =
-            case maybeFace of
-                Just newFace ->
-                    if node.inside == Empty then
-                        { node | inside = Node <| newNode plane newFace }
-
-                    else
-                        { node | inside = insert newFace node.inside }
-
-                Nothing ->
-                    node
-    in
     case tree of
         Empty ->
-            Node <| newNode facePlane face
+            Node <|
+                { faces = ( face, [] ), outside = Empty, inside = Empty, plane = planeFromFace face }
 
         Node rootData ->
             splitByPlane rootData.plane face
                 |> (\{ outside, inside } ->
-                        rootData
-                            |> handleOutside facePlane outside
-                            |> handleInside facePlane inside
-                            |> Node
+                        case ( outside, inside ) of
+                            ( Just out, Nothing ) ->
+                                Node { rootData | outside = insert out rootData.outside }
+
+                            ( Nothing, Just ins ) ->
+                                Node { rootData | inside = insert ins rootData.inside }
+
+                            ( Just out, Just ins ) ->
+                                Node
+                                    { rootData
+                                        | outside = insert out rootData.outside
+                                        , inside = insert ins rootData.inside
+                                    }
+
+                            ( Nothing, Nothing ) ->
+                                tree
                    )
 
 

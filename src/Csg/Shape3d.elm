@@ -636,6 +636,31 @@ subdivide radius faces =
             )
 
 
+scale : Length -> List (Face tag coordinates) -> List (Face tag coordinates)
+scale radius faces =
+    let
+        projectToSphere point =
+            Direction3d.from Point3d.origin point
+                |> Maybe.map (\direction -> Point3d.translateIn direction radius Point3d.origin)
+                |> Maybe.withDefault point
+    in
+    faces
+        |> List.concatMap
+            (\face ->
+                case BspTree.allPoints face of
+                    a :: b :: c :: rest ->
+                        let
+                            newPoints =
+                                [ [ projectToSphere a, projectToSphere b, projectToSphere c ] ]
+                        in
+                        newPoints
+                            |> List.filterMap toFace
+
+                    _ ->
+                        []
+            )
+
+
 
 -- Generate a geodesic sphere.
 
@@ -643,7 +668,7 @@ subdivide radius faces =
 geodesicSphere : Length -> Int -> Shape3d tag c
 geodesicSphere radius subdivisions =
     if subdivisions < 1 then
-        icosahedron
+        scale radius icosahedron
             |> BspTree.build
             |> Shape3d
 

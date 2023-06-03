@@ -87,7 +87,7 @@ dice =
             Length.meters 1
 
         dotAt x y =
-            CsgShape.sphereWith { slices = 12, stacks = 6, radius = dotRadius }
+            CsgShape.geodesicSphere dotRadius 1
                 |> CsgShape.translateBy
                     (Vector3d.meters
                         (0.3 + (x * 0.2))
@@ -131,7 +131,7 @@ dice =
                 ]
 
         sphere =
-            CsgShape.sphere (Length.centimeters 70)
+            CsgShape.geodesicSphere (Length.centimeters 70) 1
                 |> CsgShape.withTag Color.blue
 
         base =
@@ -317,7 +317,7 @@ pawn =
                 |> CsgShape.moveUp (Length.centimeters 12)
                 |> CsgShape.subtractFrom
                     (CsgShape.cylinder (Length.centimeters 15) (Length.centimeters 20))
-                    |> CsgShape.unionWith
+                |> CsgShape.unionWith
                     (CsgShape.sphereWith
                         { radius =
                             Length.centimeters 8.4

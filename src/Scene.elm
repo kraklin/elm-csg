@@ -70,12 +70,11 @@ shape =
                 |> CsgShape.intersectWith
                     --(CsgShape.cube (Length.meters 1))
                     (CsgShape.geodesicSphere (Length.meters 0.72) 1)
+
+        sphere =
+            CsgShape.geodesicSphere (Length.meters 2) 1
     in
-    cube
-        |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
-        |> CsgShape.intersectWith
-            --(CsgShape.cube (Length.meters 1))
-            (CsgShape.geodesicSphere (Length.meters 0.72) 2)
+    Models.dice
 
 
 toLines =

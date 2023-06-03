@@ -138,29 +138,29 @@ insert face tree =
 
         handleOutside : Plane3d Meters c -> Maybe (Face tag c) -> NodeData tag c -> NodeData tag c
         handleOutside plane maybeFace node =
-            maybeFace
-                |> Maybe.map
-                    (\newFace ->
-                        if node.outside == Empty then
-                            { node | outside = Node <| newNode plane newFace }
+            case maybeFace of
+                Just newFace ->
+                    if node.outside == Empty then
+                        { node | outside = Node <| newNode plane newFace }
 
-                        else
-                            { node | outside = insert newFace node.outside }
-                    )
-                |> Maybe.withDefault node
+                    else
+                        { node | outside = insert newFace node.outside }
+
+                Nothing ->
+                    node
 
         handleInside : Plane3d Meters c -> Maybe (Face tag c) -> NodeData tag c -> NodeData tag c
         handleInside plane maybeFace node =
-            maybeFace
-                |> Maybe.map
-                    (\newFace ->
-                        if node.inside == Empty then
-                            { node | inside = Node <| newNode plane newFace }
+            case maybeFace of
+                Just newFace ->
+                    if node.inside == Empty then
+                        { node | inside = Node <| newNode plane newFace }
 
-                        else
-                            { node | inside = insert newFace node.inside }
-                    )
-                |> Maybe.withDefault node
+                    else
+                        { node | inside = insert newFace node.inside }
+
+                Nothing ->
+                    node
     in
     case tree of
         Empty ->

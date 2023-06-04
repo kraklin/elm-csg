@@ -135,6 +135,7 @@ toFaces initTree =
         initTree
 
 
+insert : Face tag c -> BspTree tag c -> BspTree tag c
 insert initFace initTree =
     Recursion.runRecursion
         (\( face, tree ) ->

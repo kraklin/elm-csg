@@ -27,6 +27,7 @@ import List.NonEmpty as NonEmpty exposing (NonEmpty)
 import Plane3d exposing (Plane3d)
 import Point3d exposing (Point3d)
 import Quantity exposing (Unitless)
+import Recursion
 import Vector3d exposing (Vector3d)
 
 
@@ -113,46 +114,66 @@ build faces =
 
 
 toFaces : BspTree tag c -> List (Face tag c)
-toFaces tree =
-    let
-        traverse t =
-            case t of
+toFaces initTree =
+    Recursion.runRecursion
+        (\tree ->
+            case tree of
                 Empty ->
-                    []
+                    Recursion.base []
 
                 Node { faces, inside, outside } ->
-                    NonEmpty.toList faces ++ (traverse inside ++ traverse outside)
-    in
-    traverse tree
+                    Recursion.recurseThen inside
+                        (\newInside ->
+                            Recursion.recurseThen outside
+                                (\newOutside ->
+                                    Recursion.base <|
+                                        NonEmpty.toList faces
+                                            ++ (newInside ++ newOutside)
+                                )
+                        )
+        )
+        initTree
 
 
-insert : Face tag c -> BspTree tag c -> BspTree tag c
-insert face tree =
-    case tree of
-        Empty ->
-            Node <|
-                { faces = ( face, [] ), outside = Empty, inside = Empty, plane = planeFromFace face }
+insert initFace initTree =
+    Recursion.runRecursion
+        (\( face, tree ) ->
+            case tree of
+                Empty ->
+                    Recursion.base
+                        (Node <|
+                            { faces = ( face, [] ), outside = Empty, inside = Empty, plane = planeFromFace face }
+                        )
 
-        Node rootData ->
-            splitByPlane rootData.plane face
-                |> (\{ outside, inside } ->
-                        case ( outside, inside ) of
-                            ( Just out, Nothing ) ->
-                                Node { rootData | outside = insert out rootData.outside }
+                Node rootData ->
+                    splitByPlane rootData.plane face
+                        |> (\{ outside, inside } ->
+                                case ( outside, inside ) of
+                                    ( Just out, Nothing ) ->
+                                        Recursion.recurse ( out, rootData.outside ) |> Recursion.map (\outs -> Node { rootData | outside = outs })
 
-                            ( Nothing, Just ins ) ->
-                                Node { rootData | inside = insert ins rootData.inside }
+                                    ( Nothing, Just ins ) ->
+                                        Recursion.recurse ( ins, rootData.inside ) |> Recursion.map (\newIns -> Node { rootData | inside = newIns })
 
-                            ( Just out, Just ins ) ->
-                                Node
-                                    { rootData
-                                        | outside = insert out rootData.outside
-                                        , inside = insert ins rootData.inside
-                                    }
+                                    ( Just out, Just ins ) ->
+                                        Recursion.recurseThen ( out, rootData.outside )
+                                            (\newOut ->
+                                                Recursion.recurseThen ( ins, rootData.inside )
+                                                    (\newIns ->
+                                                        Recursion.base <|
+                                                            Node
+                                                                { rootData
+                                                                    | outside = newOut
+                                                                    , inside = newIns
+                                                                }
+                                                    )
+                                            )
 
-                            ( Nothing, Nothing ) ->
-                                tree
-                   )
+                                    ( Nothing, Nothing ) ->
+                                        Recursion.base tree
+                           )
+        )
+        ( initFace, initTree )
 
 
 fromPoints : Direction3d coordinates -> Maybe tag -> NonEmpty (Point3d Meters coordinates) -> Face tag coordinates
@@ -161,70 +182,99 @@ fromPoints normalDirection tag points =
 
 
 mapFaces : (Face tag c -> Face tag c) -> BspTree tag c -> BspTree tag c
-mapFaces fn tree =
-    let
-        traverse t =
-            case t of
+mapFaces fn initTree =
+    Recursion.runRecursion
+        (\tree ->
+            case tree of
                 Empty ->
-                    Empty
+                    Recursion.base Empty
 
                 Node nodeData ->
-                    Node
-                        { nodeData
-                            | faces = NonEmpty.map fn nodeData.faces
-                            , inside = traverse nodeData.inside
-                            , outside = traverse nodeData.outside
-                        }
-    in
-    traverse tree
+                    Recursion.recurseThen nodeData.inside
+                        (\newInside ->
+                            Recursion.recurseThen nodeData.outside
+                                (\newOutside ->
+                                    Recursion.base <|
+                                        Node
+                                            { nodeData
+                                                | faces = NonEmpty.map fn nodeData.faces
+                                                , inside = newInside
+                                                , outside = newOutside
+                                            }
+                                )
+                        )
+        )
+        initTree
 
 
 translate : Vector3d Meters c -> BspTree tag c -> BspTree tag c
-translate vector tree =
+translate vector initTree =
     let
         translateFace f =
             f.points
                 |> NonEmpty.map (Point3d.translateBy vector)
                 |> fromPoints f.normalDirection f.tag
     in
-    case tree of
-        Empty ->
-            Empty
+    Recursion.runRecursion
+        (\tree ->
+            case tree of
+                Empty ->
+                    Recursion.base Empty
 
-        Node nodeData ->
-            Node
-                { nodeData
-                    | faces = NonEmpty.map translateFace nodeData.faces
-                    , inside = translate vector nodeData.inside
-                    , outside = translate vector nodeData.outside
-                    , plane = Plane3d.translateBy vector nodeData.plane
-                }
+                Node nodeData ->
+                    Recursion.recurseThen nodeData.inside
+                        (\newInside ->
+                            Recursion.recurseThen nodeData.outside
+                                (\newOutside ->
+                                    Recursion.base <|
+                                        Node
+                                            { nodeData
+                                                | faces = NonEmpty.map translateFace nodeData.faces
+                                                , inside = newInside
+                                                , outside = newOutside
+                                                , plane = Plane3d.translateBy vector nodeData.plane
+                                            }
+                                )
+                        )
+        )
+        initTree
 
 
 rotateAround : Axis3d Meters c -> Angle -> BspTree tag c -> BspTree tag c
-rotateAround axis angle tree =
+rotateAround axis angle initTree =
     let
         rotateFace f =
             f.points
                 |> NonEmpty.map (Point3d.rotateAround axis angle)
                 |> fromPoints (Direction3d.rotateAround axis angle f.normalDirection) f.tag
     in
-    case tree of
-        Empty ->
-            Empty
+    Recursion.runRecursion
+        (\tree ->
+            case tree of
+                Empty ->
+                    Recursion.base Empty
 
-        Node nodeData ->
-            Node
-                { nodeData
-                    | faces = NonEmpty.map rotateFace nodeData.faces
-                    , inside = rotateAround axis angle nodeData.inside
-                    , outside = rotateAround axis angle nodeData.outside
-                    , plane = Plane3d.rotateAround axis angle nodeData.plane
-                }
+                Node nodeData ->
+                    Recursion.recurseThen nodeData.inside
+                        (\newInside ->
+                            Recursion.recurseThen nodeData.outside
+                                (\newOutside ->
+                                    Recursion.base <|
+                                        Node
+                                            { nodeData
+                                                | faces = NonEmpty.map rotateFace nodeData.faces
+                                                , inside = newInside
+                                                , outside = newOutside
+                                                , plane = Plane3d.rotateAround axis angle nodeData.plane
+                                            }
+                                )
+                        )
+        )
+        initTree
 
 
 scaleAbout : Point3d Meters c -> Float -> BspTree tag c -> BspTree tag c
-scaleAbout origin factor tree =
+scaleAbout origin factor initTree =
     let
         scaleFace f =
             f.points
@@ -236,22 +286,33 @@ scaleAbout origin factor tree =
                 |> Point3d.scaleAbout origin factor
                 |> (\newOrigin -> Plane3d.through newOrigin (Plane3d.normalDirection p))
     in
-    case tree of
-        Empty ->
-            Empty
+    Recursion.runRecursion
+        (\tree ->
+            case tree of
+                Empty ->
+                    Recursion.base Empty
 
-        Node nodeData ->
-            Node
-                { nodeData
-                    | faces = NonEmpty.map scaleFace nodeData.faces
-                    , inside = scaleAbout origin factor nodeData.inside
-                    , outside = scaleAbout origin factor nodeData.outside
-                    , plane = scalePlane nodeData.plane
-                }
+                Node nodeData ->
+                    Recursion.recurseThen nodeData.inside
+                        (\newInside ->
+                            Recursion.recurseThen nodeData.outside
+                                (\newOutside ->
+                                    Recursion.base <|
+                                        Node
+                                            { nodeData
+                                                | faces = NonEmpty.map scaleFace nodeData.faces
+                                                , inside = newInside
+                                                , outside = newOutside
+                                                , plane = scalePlane nodeData.plane
+                                            }
+                                )
+                        )
+        )
+        initTree
 
 
 scaleBy : Vector3d Unitless c -> BspTree tag c -> BspTree tag c
-scaleBy vector tree =
+scaleBy vector initTree =
     let
         ( xScale, yScale, zScale ) =
             Vector3d.toUnitless vector
@@ -299,18 +360,29 @@ scaleBy vector tree =
                 |> scalePoint
                 |> (\newOrigin -> Plane3d.through newOrigin (scaleDirection (Plane3d.normalDirection p)))
     in
-    case tree of
-        Empty ->
-            Empty
+    Recursion.runRecursion
+        (\tree ->
+            case tree of
+                Empty ->
+                    Recursion.base Empty
 
-        Node nodeData ->
-            Node
-                { nodeData
-                    | faces = NonEmpty.map scaleFace nodeData.faces
-                    , inside = scaleBy vector nodeData.inside
-                    , outside = scaleBy vector nodeData.outside
-                    , plane = scalePlane nodeData.plane
-                }
+                Node nodeData ->
+                    Recursion.recurseThen nodeData.inside
+                        (\newInside ->
+                            Recursion.recurseThen nodeData.outside
+                                (\newOutside ->
+                                    Recursion.base <|
+                                        Node
+                                            { nodeData
+                                                | faces = NonEmpty.map scaleFace nodeData.faces
+                                                , inside = newInside
+                                                , outside = newOutside
+                                                , plane = scalePlane nodeData.plane
+                                            }
+                                )
+                        )
+        )
+        initTree
 
 
 getOrientation : Plane3d Meters c -> ClassifiedFace c -> Orientation

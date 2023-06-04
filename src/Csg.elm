@@ -7,7 +7,6 @@ module Csg exposing
     )
 
 import BspTree exposing (Face)
-import Color exposing (Color)
 import Csg.Shape3d exposing (Shape3d)
 import Dict exposing (Dict)
 import Direction3d
@@ -162,6 +161,3 @@ toTriangularMeshGroupedByTag toComparable shape =
         |> List.foldl toColoredMeshMap Dict.empty
         |> Dict.map (\key meshes -> ( TriangularMesh.combine meshes, key ))
         |> Dict.values
-
-
-

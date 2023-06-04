@@ -64,17 +64,17 @@ type Msg
 
 shape =
     let
-        cube =
+        cube _ =
             CsgShape.cube (Length.meters 1)
                 |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
                 |> CsgShape.intersectWith
                     --(CsgShape.cube (Length.meters 1))
-                    (CsgShape.geodesicSphere (Length.meters 0.72) 1)
+                    (CsgShape.geodesicSphere (Length.meters 0.72) 2)
 
-        sphere =
-            CsgShape.geodesicSphere (Length.meters 2) 1
+        sphere _ =
+            CsgShape.geodesicSphere (Length.meters 2) 2
     in
-    Models.dice
+    Models.eightPawns
 
 
 toLines =

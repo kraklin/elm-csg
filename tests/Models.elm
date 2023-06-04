@@ -352,6 +352,18 @@ pawn =
 
 
 eightPawns =
-    pawn
-        |> CsgShape.withTag Color.black
-        |> CsgShape.scaleAbout Point3d.origin 2
+    CsgShape.group
+        [ pawn
+        , pawn |> CsgShape.moveLeft (Length.centimeters 40)
+        , pawn |> CsgShape.moveLeft (Length.centimeters 80)
+        , pawn |> CsgShape.moveLeft (Length.centimeters 120)
+        , pawn |> CsgShape.moveLeft (Length.centimeters 160)
+        , pawn |> CsgShape.moveLeft (Length.centimeters 200)
+        , pawn |> CsgShape.moveLeft (Length.centimeters 240)
+        , pawn |> CsgShape.moveLeft (Length.centimeters 280)
+        ]
+        |> CsgShape.subtractFrom
+            (CsgShape.cuboid { width = Length.centimeters 320, height = Length.centimeters 80, depth = Length.centimeters 20 }
+                |> CsgShape.moveLeft (Length.centimeters 280)
+            )
+        |> CsgShape.withTag Color.green

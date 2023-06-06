@@ -5,8 +5,8 @@
   "author": "Tomas Latal <latal.tomas@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "elm-live": "^4.0.2",
-    "elm-tooling": "^1.3.0"
+    "elm-tooling": "^1.3.0",
+    "elm-watch": "^1.1.2"
   },
   "scripts": {
     "start": "elm-live src/Scene.elm",

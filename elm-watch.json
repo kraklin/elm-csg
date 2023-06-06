@@ -1,0 +1,10 @@
+{
+  "targets": {
+    "My target name": {
+      "inputs": [
+        "src/Scene.elm"
+      ],
+      "output": "build/main.js"
+    }
+  }
+}

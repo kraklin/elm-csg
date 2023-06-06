@@ -13,9 +13,11 @@ import Color
 import Csg
 import Csg.Shape3d as CsgShape
 import Direction3d
+import File.Download as Download
 import Html
 import Html.Attributes as Attrs
 import Html.Events as Events
+import Html.Events.Extra.Wheel as Wheel
 import Json.Decode as Decode exposing (Decoder)
 import Length exposing (Meters)
 import LineSegment3d exposing (LineSegment3d)
@@ -45,17 +47,18 @@ type alias Model =
     { azimuth : Angle -- Orbiting angle of the camera around the focal point
     , elevation : Angle -- Angle of the camera up from the XY plane
     , orbiting : Bool -- Whether the mouse button is currently down
+    , cameraDistance : Length.Length
     , clipPlanePosition : Float
     , mesh : Scene3d.Entity WorldCoordinates
     , trianglesCount : Int
     , showAxis : Bool
-    , obj : String
     }
 
 
 type Msg
     = MouseDown
     | MouseUp
+    | MouseWheel Float
     | MouseMove (Quantity Float Pixels) (Quantity Float Pixels)
     | MeshSelected String
     | EncodeObj
@@ -69,10 +72,8 @@ init () =
       , elevation = Angle.degrees 30
       , orbiting = False
       , clipPlanePosition = -0.5
-      , mesh =
-            meshToShow
-                |> toSceneEntity
-      , obj = ""
+      , cameraDistance = Length.meters 10
+      , mesh = meshToShow |> toSceneEntity
 
       --|> toWireframe
       , showAxis = False
@@ -103,13 +104,15 @@ colorFromKey ( r, g, b ) =
 toSceneEntity : CsgShape.Shape3d Color.Color WorldCoordinates -> Scene3d.Entity WorldCoordinates
 toSceneEntity csg =
     csg
-        |> Csg.toTriangularMeshGroupedByTag tagToComparable
+        --|> Csg.toTriangularMeshGroupedByTag tagToComparable
+        |> Csg.toTriangularMesh
+        |> List.singleton
         |> List.map
-            (\( mesh, color ) ->
+            (\mesh ->
                 mesh
                     |> Mesh.indexedFaces
                     |> Mesh.cullBackFaces
-                    |> Scene3d.mesh (Material.metal { baseColor = colorFromKey color, roughness = 0 })
+                    |> Scene3d.mesh (Material.metal { baseColor = Color.gray, roughness = 0 })
             )
         |> Scene3d.group
 
@@ -168,6 +171,16 @@ update message model =
             else
                 ( model, Cmd.none )
 
+        MouseWheel dy ->
+            ( { model
+                | cameraDistance =
+                    model.cameraDistance
+                        |> Quantity.plus (Quantity.timesUnitless (Quantity.float dy) (Length.meters 0.1))
+                        |> Quantity.clamp (Length.meters 0.1) (Length.meters 30)
+              }
+            , Cmd.none
+            )
+
         MeshSelected meshName ->
             let
                 mesh =
@@ -182,7 +195,7 @@ update message model =
                             Models.sphericon
 
                         "pawns" ->
-                            Models.eightPawns
+                            Models.pawn
 
                         "tCube" ->
                             Models.transformationsCube
@@ -203,11 +216,12 @@ update message model =
         EncodeObj ->
             let
                 object =
-                    Models.sphericon
+                    Models.transformationsCube
                         |> Csg.toTriangularMesh
                         |> Obj.faces
+                        |> Obj.encode Length.inMillimeters
             in
-            ( { model | obj = Obj.encode Length.inMeters object }, Cmd.none )
+            ( model, Download.string "model.obj" "file/obj" object )
 
 
 {-| Use movementX and movementY for simplicity (don't need to store initial
@@ -496,7 +510,7 @@ view model =
                 { focalPoint = Point3d.meters 0 0 0
                 , azimuth = model.azimuth
                 , elevation = model.elevation
-                , distance = Length.meters 7
+                , distance = model.cameraDistance
                 }
 
         cameraMesh =
@@ -537,7 +551,11 @@ view model =
             ]
         , Html.div
             [ Attrs.style "position" "absolute" ]
-            [ Html.select [ Attrs.id "select", Events.on "change" <| Decode.map MeshSelected meshSelectDecoder ]
+            [ Html.select
+                [ Attrs.id "select"
+                , Events.on "change" <| Decode.map MeshSelected meshSelectDecoder
+                , Wheel.onWheel (.deltaY >> MouseWheel)
+                ]
                 [ Html.option [ Attrs.value "allShapes" ] [ Html.text "All shapes" ]
                 , Html.option [ Attrs.value "sphericon" ] [ Html.text "Sphericon" ]
                 , Html.option [ Attrs.value "pawns" ] [ Html.text "Chess Pawns" ]
@@ -546,7 +564,10 @@ view model =
                 ]
             , Html.button [ Events.onClick EncodeObj ] [ Html.text "Create OBJ" ]
             ]
-        , Html.div [ Attrs.style "background-color" "rgba(255, 255, 0, 0.2)" ]
+        , Html.div
+            [ Attrs.style "background-color" "rgba(255, 255, 0, 0.2)"
+            , Wheel.onWheel (.deltaY >> MouseWheel)
+            ]
             [ Scene3d.cloudy
                 { camera = cameraMesh
                 , clipDepth = Length.meters 0.1
@@ -563,7 +584,6 @@ view model =
                 , upDirection = Direction3d.positiveZ
                 }
             ]
-        , Html.pre [] [ Html.text model.obj ]
         ]
     }
 

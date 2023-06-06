@@ -310,7 +310,6 @@ pawn =
                     (CsgShape.cylinder (Length.centimeters 15) (Length.centimeters 8)
                         |> CsgShape.moveUp (Length.centimeters 4)
                     )
-                |> CsgShape.withTag Color.yellow
 
         top =
             CsgShape.torus (Length.centimeters 12) (Length.centimeters 29)
@@ -321,8 +320,8 @@ pawn =
                     (CsgShape.sphereWith
                         { radius =
                             Length.centimeters 8.4
-                        , stacks = 4
-                        , slices = 8
+                        , stacks = 8
+                        , slices = 16
                         }
                         |> CsgShape.rotateAround Axis3d.x (Angle.degrees 90)
                         |> CsgShape.intersectWith
@@ -338,8 +337,8 @@ pawn =
             CsgShape.sphereWith
                 { radius =
                     Length.centimeters 8.4
-                , stacks = 4
-                , slices = 8
+                , stacks = 8
+                , slices = 16
                 }
                 |> CsgShape.rotateAround Axis3d.x (Angle.degrees 90)
                 |> CsgShape.scaleBy (Vector3d.unitless 1 1 1.1)
@@ -363,7 +362,6 @@ eightPawns =
         , pawn |> CsgShape.moveLeft (Length.centimeters 280)
         ]
         |> CsgShape.subtractFrom
-            (CsgShape.cuboid { width = Length.centimeters 320, height = Length.centimeters 80, depth = Length.centimeters 20 }
-                |> CsgShape.moveLeft (Length.centimeters 280)
+            (CsgShape.cuboid { width = Length.centimeters 340, height = Length.centimeters 80, depth = Length.centimeters 20 }
+                |> CsgShape.moveLeft (Length.centimeters 310)
             )
-        |> CsgShape.withTag Color.green

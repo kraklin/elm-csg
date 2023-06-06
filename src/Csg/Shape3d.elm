@@ -31,7 +31,6 @@ module Csg.Shape3d exposing
 import Angle exposing (Angle)
 import Axis3d exposing (Axis3d)
 import BspTree exposing (BspTree, Face)
-import Color exposing (Color)
 import Direction3d
 import Length exposing (Length, Meters)
 import List.Extra as List
@@ -275,7 +274,7 @@ coneDefaultSettings =
     , bottomPoint = Point3d.origin
     , topPoint = Point3d.meters 0 0 1
     , topRadius = Length.meters 0
-    , slices = 8
+    , slices = 16
     }
 
 
@@ -436,10 +435,10 @@ torus : Length -> Length -> Shape3d tag c
 torus innerRadius outerRadius =
     let
         stacks_ =
-            8
+            16
 
         slices_ =
-            8
+            16
 
         deltaOuter =
             Angle.turns (1 / toFloat stacks_)

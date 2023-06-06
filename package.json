@@ -6,11 +6,12 @@
   "license": "MIT",
   "devDependencies": {
     "elm-tooling": "^1.3.0",
-    "elm-watch": "^1.1.2"
+    "elm-watch": "^1.1.2",
+    "run-pty": "^4.0.3"
   },
   "scripts": {
-    "start": "elm-live src/Scene.elm",
-    "build": "elm make tests/Viewer.elm --output docs/index.html",
+    "start": "run-pty %% elm-watch hot %% http-server ./build",
+    "build": "elm-watch make tests/Viewer.elm --output docs/index.html",
     "test": "elm-test-rs",
     "postinstall": "elm-tooling install"
   },

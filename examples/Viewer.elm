@@ -34,7 +34,7 @@ import Viewpoint3d
 
 
 meshToShow =
-    CsgShape.geodesicSphere 1 1
+    CsgShape.geodesicSphere (Length.meters 1) 1
 
 
 type WorldCoordinates
@@ -85,16 +85,31 @@ init () =
     )
 
 
+tagToComparable tag =
+    case tag of
+        Just color ->
+            Color.toRgba color
+                |> (\{ red, green, blue } -> ( red, green, blue ))
+
+        Nothing ->
+            Color.toRgba Color.gray
+                |> (\{ red, green, blue } -> ( red, green, blue ))
+
+
+colorFromKey ( r, g, b ) =
+    Color.rgb r g b
+
+
 toSceneEntity : CsgShape.Shape3d Color.Color WorldCoordinates -> Scene3d.Entity WorldCoordinates
 toSceneEntity csg =
     csg
-        |> Csg.toTriangularMeshGroupedByTag
+        |> Csg.toTriangularMeshGroupedByTag tagToComparable
         |> List.map
             (\( mesh, color ) ->
                 mesh
                     |> Mesh.indexedFaces
                     |> Mesh.cullBackFaces
-                    |> Scene3d.mesh (Material.metal { baseColor = color, roughness = 0 })
+                    |> Scene3d.mesh (Material.metal { baseColor = colorFromKey color, roughness = 0 })
             )
         |> Scene3d.group
 

@@ -199,22 +199,22 @@ sphericon =
 transformationsCube =
     let
         cube =
-            CsgShape.cube (Length.meters 1)
-                |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
+            CsgShape.cube (Length.meters 0.1)
+                |> CsgShape.translateBy (Vector3d.meters -0.05 -0.05 -0.05)
                 |> CsgShape.withTag Color.red
 
         sphere =
-            CsgShape.sphere (Length.centimeters 70)
+            CsgShape.sphere (Length.centimeters 7)
                 |> CsgShape.withTag Color.blue
 
         cylinderY =
-            CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters 0 -1 0) (Point3d.meters 0 1 0)
+            CsgShape.cylinderFromTo (Length.centimeters 4) (Point3d.meters 0 -0.1 0) (Point3d.meters 0 0.1 0)
 
         cylinderX =
-            CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters -1 0 0) (Point3d.meters 1 0 0)
+            CsgShape.cylinderFromTo (Length.centimeters 4) (Point3d.meters -0.1 0 0) (Point3d.meters 0.1 0 0)
 
         cylinderZ =
-            CsgShape.cylinderFromTo (Length.centimeters 40) (Point3d.meters 0 0 -1) (Point3d.meters 0 0 1)
+            CsgShape.cylinderFromTo (Length.centimeters 4) (Point3d.meters 0 0 -0.1) (Point3d.meters 0 0 0.1)
 
         cylinders =
             cylinderX

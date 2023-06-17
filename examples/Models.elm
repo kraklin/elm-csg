@@ -4,6 +4,7 @@ module Models exposing
     , dice
     , eightPawns
     , pawn
+    , roundedCuboid
     , simpleTransformations
     , sphericon
     , torus
@@ -182,6 +183,15 @@ sphericon =
                     twoCones
     in
     twoCones
+
+
+roundedCuboid =
+    CsgShape.roundedCuboid
+        { width = Length.centimeters 500
+        , height = Length.centimeters 300
+        , depth = Length.centimeters 100
+        , radius = Length.centimeters 20
+        }
 
 
 

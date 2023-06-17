@@ -36,7 +36,7 @@ import Viewpoint3d
 
 
 meshToShow =
-    CsgShape.geodesicSphere (Length.meters 1) 1
+    Models.roundedCuboid
 
 
 type WorldCoordinates
@@ -73,7 +73,9 @@ init () =
       , orbiting = False
       , clipPlanePosition = -0.5
       , cameraDistance = Length.meters 10
-      , mesh = meshToShow |> toSceneEntity
+      , mesh =
+            meshToShow
+                |> toSceneEntity
 
       --|> toWireframe
       , showAxis = False

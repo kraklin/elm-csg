@@ -2,7 +2,7 @@
   "targets": {
     "My target name": {
       "inputs": [
-        "examples/Viewer.elm"
+        "src/Scene.elm"
       ],
       "output": "build/main.js"
     }

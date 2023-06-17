@@ -153,115 +153,141 @@ roundedCuboid { width, height, depth, radius } =
             minusRadius =
                 Quantity.minus radius
 
+            -- front
+            fa =
+                Point3d.xyz radius z radius
+
+            fd =
+                Point3d.xyz (minusRadius width) z radius
+
+            fc =
+                Point3d.xyz (minusRadius width) z (minusRadius height)
+
+            fb =
+                Point3d.xyz radius z (minusRadius height)
+
             front =
-                --toFace [ a, d, c, b ]
-                toFace
-                    [ Point3d.xyz radius z radius
-                    , Point3d.xyz (minusRadius width) z radius
-                    , Point3d.xyz (minusRadius width) z (minusRadius height)
-                    , Point3d.xyz radius z (minusRadius height)
-                    ]
+                toFace [ fa, fd, fc, fb ]
+
+            -- back
+            be =
+                Point3d.xyz radius depth radius
+
+            bf =
+                Point3d.xyz radius depth (minusRadius height)
+
+            bg =
+                Point3d.xyz (minusRadius width) depth (minusRadius height)
+
+            bh =
+                Point3d.xyz (minusRadius width) depth radius
 
             back =
-                --toFace [ e, f, g, h ]
-                toFace
-                    [ Point3d.xyz radius depth radius
-                    , Point3d.xyz radius depth (minusRadius height)
-                    , Point3d.xyz (minusRadius width) depth (minusRadius height)
-                    , Point3d.xyz (minusRadius width) depth radius
-                    ]
+                toFace [ be, bf, bg, bh ]
+
+            -- top
+            tb =
+                Point3d.xyz radius radius height
+
+            tc =
+                Point3d.xyz (minusRadius width) radius height
+
+            tg =
+                Point3d.xyz (minusRadius width) (minusRadius depth) height
+
+            tf =
+                Point3d.xyz radius (minusRadius depth) height
 
             top =
-                --toFace [ b, c, g, f ]
-                toFace
-                    [ Point3d.xyz radius radius height
-                    , Point3d.xyz (minusRadius width) radius height
-                    , Point3d.xyz (minusRadius width) (minusRadius depth) height
-                    , Point3d.xyz radius (minusRadius depth) height
-                    ]
+                toFace [ tb, tc, tg, tf ]
+
+            -- bottom
+            bta =
+                Point3d.xyz radius radius z
+
+            bte =
+                Point3d.xyz radius (minusRadius depth) z
+
+            bth =
+                Point3d.xyz (minusRadius width) (minusRadius depth) z
+
+            btd =
+                Point3d.xyz (minusRadius width) radius z
 
             bottom =
-                --toFace [ a, e, h, d ]
-                toFace
-                    [ Point3d.xyz radius radius z
-                    , Point3d.xyz radius (minusRadius depth) z
-                    , Point3d.xyz (minusRadius width) (minusRadius depth) z
-                    , Point3d.xyz (minusRadius width) radius z
-                    ]
+                toFace [ bta, bte, bth, btd ]
+
+            --left
+            la =
+                Point3d.xyz z radius radius
+
+            lb =
+                Point3d.xyz z radius (minusRadius height)
+
+            lf =
+                Point3d.xyz z (minusRadius depth) (minusRadius height)
+
+            le =
+                Point3d.xyz z (minusRadius depth) radius
 
             left =
-                --toFace [ a, b, f, e ]
-                toFace
-                    [ Point3d.xyz z radius radius
-                    , Point3d.xyz z radius (minusRadius height)
-                    , Point3d.xyz z (minusRadius depth) (minusRadius height)
-                    , Point3d.xyz z (minusRadius depth) radius
-                    ]
+                toFace [ la, lb, lf, le ]
+
+            -- right
+            rc =
+                Point3d.xyz width radius (minusRadius height)
+
+            rd =
+                Point3d.xyz width radius radius
+
+            rh =
+                Point3d.xyz width (minusRadius depth) radius
+
+            rg =
+                Point3d.xyz width (minusRadius depth) (minusRadius height)
 
             right =
-                --toFace [ c, d, h, g ]
-                toFace
-                    [ Point3d.xyz width radius (minusRadius height)
-                    , Point3d.xyz width radius radius
-                    , Point3d.xyz width (minusRadius depth) radius
-                    , Point3d.xyz width (minusRadius depth) (minusRadius height)
-                    ]
+                toFace [ rc, rd, rh, rg ]
 
+            -- edges
             frontTopEdge =
-                --toFace [ fc, tc, tb, fb ]
-                toFace
-                    [ Point3d.xyz (minusRadius width) z (minusRadius height)
-                    , Point3d.xyz (minusRadius width) radius height
-                    , Point3d.xyz radius radius height
-                    , Point3d.xyz radius z (minusRadius height)
-                    ]
+                toFace [ fc, tc, tb, fb ]
 
             frontBottomEdge =
-                --toFace [ fa, ba, bd, fd ]
-                toFace
-                    [ Point3d.xyz radius z radius
-                    , Point3d.xyz radius radius z
-                    , Point3d.xyz (minusRadius width) radius z
-                    , Point3d.xyz (minusRadius width) z radius
-                    ]
+                toFace [ fa, bta, btd, fd ]
 
             backBottomEdge =
-                --toFace [ bce, bch, bth, bte ]
-                toFace
-                    [ Point3d.xyz radius depth radius
-                    , Point3d.xyz (minusRadius width) depth radius
-                    , Point3d.xyz (minusRadius width) (minusRadius depth) z
-                    , Point3d.xyz radius (minusRadius depth) z
-                    ]
+                toFace [ be, bh, bth, bte ]
 
             backTopEdge =
-                --toFace [ bcf, btf, btg bcg ]
-                toFace
-                    [ Point3d.xyz radius depth (minusRadius height)
-                    , Point3d.xyz radius (minusRadius depth) height
-                    , Point3d.xyz (minusRadius width) (minusRadius depth) height
-                    , Point3d.xyz (minusRadius width) depth (minusRadius height)
-                    ]
+                toFace [ bf, tf, tg, bg ]
 
             leftBottomEdge =
-                --toFace [ bta, la, le, bte ]
-                toFace
-                    [ Point3d.xyz radius radius z
-                    , Point3d.xyz z radius radius
-                    , Point3d.xyz z (minusRadius depth) radius
-                    , Point3d.xyz radius (minusRadius depth) z
-                    ]
+                toFace [ bta, la, le, bte ]
 
             leftTopEdge =
-                --toFace [ lb, tb, tf, lf ]
-                toFace
-                    [ Point3d.xyz z radius (minusRadius height)
-                    , Point3d.xyz radius radius height
-                    , Point3d.xyz radius (minusRadius depth) height
-                    , Point3d.xyz z (minusRadius depth) (minusRadius height)
-                    ]
+                toFace [ lb, tb, tf, lf ]
+
+            rightTopEdge =
+                toFace [ rc, rg, tg, tc ]
+
+            rightBottomEdge =
+                toFace [ btd, bth, rh, rd ]
+
+            frontLeftEdge =
+                toFace [ la, fa, fb, lb ]
+
+            frontRightEdge =
+                toFace [ fd, rd, rc, fc ]
+
+            backRightEdge =
+                toFace [ rh, bh, bg, rg ]
+
+            backLeftEdge =
+                toFace [ be, le, lf, bf ]
         in
-        [ front, back, top, bottom, left, right, frontTopEdge, frontBottomEdge, backBottomEdge, backTopEdge, leftBottomEdge, leftTopEdge ]
+        [ front, back, top, bottom, left, right ]
+            ++ [ frontTopEdge, frontBottomEdge, backBottomEdge, backTopEdge, leftBottomEdge, leftTopEdge, rightTopEdge, rightBottomEdge, frontLeftEdge, frontRightEdge, backRightEdge, backLeftEdge ]
             |> List.filterMap identity
             |> BspTree.build
             |> Shape3d

@@ -63,18 +63,7 @@ type Msg
 
 
 shape =
-    let
-        cube _ =
-            CsgShape.cube (Length.meters 1)
-                |> CsgShape.translateBy (Vector3d.meters -0.5 -0.5 -0.5)
-                |> CsgShape.intersectWith
-                    --(CsgShape.cube (Length.meters 1))
-                    (CsgShape.geodesicSphere (Length.meters 0.72) 2)
-
-        sphere _ =
-            CsgShape.geodesicSphere (Length.meters 2) 2
-    in
-    Models.eightPawns
+    CsgShape.roundedCuboid { width = Length.centimeters 200, height = Length.centimeters 150, depth = Length.centimeters 100, radius = Length.centimeters 10 }
 
 
 toLines =

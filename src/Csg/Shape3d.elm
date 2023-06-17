@@ -257,7 +257,7 @@ roundedCuboid { width, height, depth, radius } =
                 toFace [ fa, bta, btd, fd ]
 
             backBottomEdge =
-                toFace [ be, bh, bth, bte ]
+                toFace [ bte, be, bh, bth ]
 
             backTopEdge =
                 toFace [ bf, tf, tg, bg ]
@@ -269,10 +269,10 @@ roundedCuboid { width, height, depth, radius } =
                 toFace [ lb, tb, tf, lf ]
 
             rightTopEdge =
-                toFace [ rc, rg, tg, tc ]
+                toFace [ tc, rc, rg, tg ]
 
             rightBottomEdge =
-                toFace [ btd, bth, rh, rd ]
+                toFace [ rd, btd, bth, rh ]
 
             frontLeftEdge =
                 toFace [ la, fa, fb, lb ]
@@ -285,9 +285,35 @@ roundedCuboid { width, height, depth, radius } =
 
             backLeftEdge =
                 toFace [ be, le, lf, bf ]
+
+            -- corners
+            aCorner =
+                toFace [ bta, fa, la ]
+
+            bCorner =
+                toFace [ tb, lb, fb ]
+
+            cCorner =
+                toFace [ tc, fc, rc ]
+
+            dCorner =
+                toFace [ fd, btd, rd ]
+
+            eCorner =
+                toFace [ bte, le, be ]
+
+            fCorner =
+                toFace [ tf, bf, lf ]
+
+            gCorner =
+                toFace [ bg, tg, rg ]
+
+            hCorner =
+                toFace [ rh, bth, bh ]
         in
         [ front, back, top, bottom, left, right ]
             ++ [ frontTopEdge, frontBottomEdge, backBottomEdge, backTopEdge, leftBottomEdge, leftTopEdge, rightTopEdge, rightBottomEdge, frontLeftEdge, frontRightEdge, backRightEdge, backLeftEdge ]
+            ++ [ aCorner, bCorner, cCorner, dCorner, eCorner, fCorner, gCorner, hCorner ]
             |> List.filterMap identity
             |> BspTree.build
             |> Shape3d

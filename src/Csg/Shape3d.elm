@@ -36,6 +36,7 @@ import Direction3d
 import Length exposing (Length, Meters)
 import List.Extra as List
 import List.NonEmpty as NonEmpty
+import Plane3d
 import Point3d exposing (Point3d)
 import Quantity exposing (Unitless)
 import Triangle3d
@@ -140,6 +141,20 @@ cube size =
     cuboid { width = size, height = size, depth = size }
 
 
+triangleStrip : List (Point3d Meters c) -> List (Face tag c)
+triangleStrip points =
+    List.groupsOfWithStep 3 1 points
+        |> List.indexedMap
+            (\idx points_ ->
+                if modBy 2 idx == 0 then
+                    List.reverse points_
+
+                else
+                    points_
+            )
+        |> List.filterMap toFace
+
+
 roundedCuboid : { width : Length, height : Length, depth : Length, radius : Length } -> Shape3d tag c
 roundedCuboid { width, height, depth, radius } =
     if Quantity.lessThanOrEqualTo Quantity.zero radius then
@@ -147,180 +162,167 @@ roundedCuboid { width, height, depth, radius } =
 
     else
         let
-            z =
-                Length.meters 0
-
             minusRadius =
                 Quantity.minus radius
 
-            -- front
-            fa =
-                Point3d.xyz radius z radius
+            a =
+                Point3d.xyz radius radius radius
 
-            fd =
-                Point3d.xyz (minusRadius width) z radius
+            b =
+                Point3d.xyz radius radius (minusRadius height)
 
-            fc =
-                Point3d.xyz (minusRadius width) z (minusRadius height)
+            c =
+                Point3d.xyz (minusRadius width) radius (minusRadius height)
 
-            fb =
-                Point3d.xyz radius z (minusRadius height)
+            d =
+                Point3d.xyz (minusRadius width) radius radius
 
+            e =
+                Point3d.xyz radius (minusRadius depth) radius
+
+            f =
+                Point3d.xyz radius (minusRadius depth) (minusRadius height)
+
+            g =
+                Point3d.xyz (minusRadius width) (minusRadius depth) (minusRadius height)
+
+            h =
+                Point3d.xyz (minusRadius width) (minusRadius depth) radius
+
+            toFrontPoint =
+                Point3d.projectOnto Plane3d.zx
+
+            toBottomPoint =
+                Point3d.projectOnto Plane3d.xy
+
+            toLeftPoint =
+                Point3d.projectOnto Plane3d.yz
+
+            toTopPoint =
+                Plane3d.through (Point3d.xyz width depth height) Direction3d.z
+                    |> Point3d.projectOnto
+
+            toRightPoint =
+                Plane3d.through (Point3d.xyz width depth height) Direction3d.x
+                    |> Point3d.projectOnto
+
+            toBackPoint =
+                Plane3d.through (Point3d.xyz width depth height) Direction3d.y
+                    |> Point3d.projectOnto
+
+            -- faces
             front =
-                toFace [ fa, fd, fc, fb ]
-
-            -- back
-            be =
-                Point3d.xyz radius depth radius
-
-            bf =
-                Point3d.xyz radius depth (minusRadius height)
-
-            bg =
-                Point3d.xyz (minusRadius width) depth (minusRadius height)
-
-            bh =
-                Point3d.xyz (minusRadius width) depth radius
+                [ a, b, d, c ]
+                    |> List.map toFrontPoint
+                    |> triangleStrip
 
             back =
-                toFace [ be, bf, bg, bh ]
-
-            -- top
-            tb =
-                Point3d.xyz radius radius height
-
-            tc =
-                Point3d.xyz (minusRadius width) radius height
-
-            tg =
-                Point3d.xyz (minusRadius width) (minusRadius depth) height
-
-            tf =
-                Point3d.xyz radius (minusRadius depth) height
+                [ h, g, e, f ]
+                    |> List.map toBackPoint
+                    |> triangleStrip
 
             top =
-                toFace [ tb, tc, tg, tf ]
-
-            -- bottom
-            bta =
-                Point3d.xyz radius radius z
-
-            bte =
-                Point3d.xyz radius (minusRadius depth) z
-
-            bth =
-                Point3d.xyz (minusRadius width) (minusRadius depth) z
-
-            btd =
-                Point3d.xyz (minusRadius width) radius z
+                [ b, f, c, g ]
+                    |> List.map toTopPoint
+                    |> triangleStrip
 
             bottom =
-                toFace [ bta, bte, bth, btd ]
-
-            --left
-            la =
-                Point3d.xyz z radius radius
-
-            lb =
-                Point3d.xyz z radius (minusRadius height)
-
-            lf =
-                Point3d.xyz z (minusRadius depth) (minusRadius height)
-
-            le =
-                Point3d.xyz z (minusRadius depth) radius
+                [ e, a, h, d ]
+                    |> List.map toBottomPoint
+                    |> triangleStrip
 
             left =
-                toFace [ la, lb, lf, le ]
-
-            -- right
-            rc =
-                Point3d.xyz width radius (minusRadius height)
-
-            rd =
-                Point3d.xyz width radius radius
-
-            rh =
-                Point3d.xyz width (minusRadius depth) radius
-
-            rg =
-                Point3d.xyz width (minusRadius depth) (minusRadius height)
+                [ e, f, a, b ]
+                    |> List.map toLeftPoint
+                    |> triangleStrip
 
             right =
-                toFace [ rc, rd, rh, rg ]
+                [ d, c, h, g ]
+                    |> List.map toRightPoint
+                    |> triangleStrip
+
+            faces =
+                [ front, back, top, bottom, left, right ]
 
             -- edges
+            edge fromPoint toPoint toFrom toTo =
+                triangleStrip [ toFrom fromPoint, toTo fromPoint, toFrom toPoint, toTo toPoint ]
+
             frontTopEdge =
-                toFace [ fc, tc, tb, fb ]
+                edge b c toFrontPoint toTopPoint
 
             frontBottomEdge =
-                toFace [ fa, bta, btd, fd ]
+                edge a d toBottomPoint toFrontPoint
 
             backBottomEdge =
-                toFace [ bte, be, bh, bth ]
+                edge e h toBackPoint toBottomPoint
 
             backTopEdge =
-                toFace [ bf, tf, tg, bg ]
+                edge f g toTopPoint toBackPoint
 
             leftBottomEdge =
-                toFace [ bta, la, le, bte ]
+                edge e a toBottomPoint toLeftPoint
 
             leftTopEdge =
-                toFace [ lb, tb, tf, lf ]
+                edge b f toTopPoint toLeftPoint
 
             rightTopEdge =
-                toFace [ tc, rc, rg, tg ]
+                edge c g toRightPoint toTopPoint
 
             rightBottomEdge =
-                toFace [ rd, btd, bth, rh ]
+                edge d h toBottomPoint toRightPoint
 
             frontLeftEdge =
-                toFace [ la, fa, fb, lb ]
+                edge a b toFrontPoint toLeftPoint
 
             frontRightEdge =
-                toFace [ fd, rd, rc, fc ]
+                edge c d toFrontPoint toRightPoint
 
             backRightEdge =
-                toFace [ rh, bh, bg, rg ]
+                edge g h toRightPoint toBackPoint
 
             backLeftEdge =
-                toFace [ be, le, lf, bf ]
+                edge e f toLeftPoint toBackPoint
+
+            edges =
+                [ frontTopEdge, frontBottomEdge, backBottomEdge, backTopEdge, leftBottomEdge, leftTopEdge, rightTopEdge, rightBottomEdge, frontLeftEdge, frontRightEdge, backRightEdge, backLeftEdge ]
 
             -- corners
+            corner point toFirstPlane toSecondPlane toThirdPlane =
+                [ toThirdPlane point, toSecondPlane point, toFirstPlane point ]
+                    |> triangleStrip
+
             aCorner =
-                toFace [ bta, fa, la ]
+                corner a toBottomPoint toFrontPoint toLeftPoint
 
             bCorner =
-                toFace [ tb, lb, fb ]
+                corner b toTopPoint toLeftPoint toFrontPoint
 
             cCorner =
-                toFace [ tc, fc, rc ]
+                corner c toTopPoint toFrontPoint toRightPoint
 
             dCorner =
-                toFace [ fd, btd, rd ]
+                corner d toBottomPoint toRightPoint toFrontPoint
 
             eCorner =
-                toFace [ bte, le, be ]
+                corner e toBottomPoint toLeftPoint toBackPoint
 
             fCorner =
-                toFace [ tf, bf, lf ]
+                corner f toTopPoint toBackPoint toLeftPoint
 
             gCorner =
-                toFace [ bg, tg, rg ]
+                corner g toTopPoint toRightPoint toBackPoint
 
             hCorner =
-                toFace [ rh, bth, bh ]
+                corner h toBottomPoint toBackPoint toRightPoint
+
+            corners =
+                [ aCorner, bCorner, cCorner, dCorner, eCorner, fCorner, gCorner, hCorner ]
         in
-        [ front, back, top, bottom, left, right ]
-            ++ [ frontTopEdge, frontBottomEdge, backBottomEdge, backTopEdge, leftBottomEdge, leftTopEdge, rightTopEdge, rightBottomEdge, frontLeftEdge, frontRightEdge, backRightEdge, backLeftEdge ]
-            ++ [ aCorner, bCorner, cCorner, dCorner, eCorner, fCorner, gCorner, hCorner ]
-            |> List.filterMap identity
+        (faces ++ edges ++ corners)
+            |> List.concat
             |> BspTree.build
             |> Shape3d
-
-
-
--- Sphere
 
 
 type alias SphereSettings =

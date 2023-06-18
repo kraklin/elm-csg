@@ -28,6 +28,7 @@ import Quantity exposing (Quantity)
 import Scene3d
 import Scene3d.Material as Material
 import Scene3d.Mesh as Mesh exposing (Mesh)
+import Task
 import Triangle3d
 import Vector3d
 import Viewpoint3d
@@ -43,7 +44,6 @@ type alias Model =
     , orbiting : Bool -- Whether the mouse button is currently down
     , cameraDistance : Length.Length
     , clipPlanePosition : Float
-    , csg : CsgShape.Shape3d Color.Color WorldCoordinates
     , mesh : Scene3d.Entity WorldCoordinates
     , lines : Scene3d.Entity WorldCoordinates
     , showAxis : Bool
@@ -60,10 +60,7 @@ type Msg
     | PlanePositionChanged String
     | ToggleLines
     | ToggleAxis
-
-
-shape =
-    CsgShape.roundedCuboid { width = Length.centimeters 200, height = Length.centimeters 150, depth = Length.centimeters 100, radius = Length.centimeters 10 }
+    | LoadModel
 
 
 toLines =
@@ -100,41 +97,58 @@ init () =
             Length.meters 10
 
         mesh =
-            shape
-                |> Csg.toTriangularMeshGroupedByTag tagToComparable
-                |> List.map
-                    (\( mesh_, key ) ->
-                        mesh_
-                            |> Mesh.indexedFaces
-                            |> Scene3d.mesh (Material.metal { baseColor = colorFromKey key, roughness = 0.6 })
-                    )
-                |> Scene3d.group
+            Scene3d.group []
 
         lines =
-            toLines shape
+            Scene3d.group []
 
         triCount =
-            shape |> Csg.toTriangles |> List.length
+            0
     in
     ( { azimuth = Angle.degrees -60
       , elevation = Angle.degrees 30
       , orbiting = False
       , cameraDistance = cameraDistance
       , clipPlanePosition = -0.5
-      , csg = shape
       , mesh = mesh
       , lines = lines
       , triCount = triCount
       , showAxis = False
       , showLines = True
       }
-    , Cmd.none
+    , Task.perform identity <| Task.succeed LoadModel
     )
+
+
+shape =
+    CsgShape.roundedCuboid { width = Length.centimeters 200, height = Length.centimeters 150, depth = Length.centimeters 100, radius = Length.centimeters 20 }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
     case message of
+        LoadModel ->
+            let
+                mesh =
+                    shape
+                        |> Csg.toTriangularMeshGroupedByTag tagToComparable
+                        |> List.map
+                            (\( mesh_, key ) ->
+                                mesh_
+                                    |> Mesh.indexedFaces
+                                    |> Scene3d.mesh (Material.metal { baseColor = colorFromKey key, roughness = 0.6 })
+                            )
+                        |> List.append [ toLines shape ]
+                        |> Scene3d.group
+
+                lines =
+                    toLines shape
+
+                triCount =
+                    shape |> Csg.toTriangles |> List.length
+            in
+            ( { model | mesh = mesh, lines = lines, triCount = triCount }, Cmd.none )
+
         -- Start orbiting when a mouse button is pressed
         MouseDown ->
             ( { model | orbiting = True }, Cmd.none )
@@ -472,6 +486,24 @@ view model =
                 { viewpoint = viewpointMesh
                 , verticalFieldOfView = Angle.degrees 30
                 }
+
+        mesh =
+            shape
+                |> Csg.toTriangularMeshGroupedByTag tagToComparable
+                |> List.map
+                    (\( mesh_, key ) ->
+                        mesh_
+                            |> Mesh.indexedFaces
+                            |> Scene3d.mesh (Material.metal { baseColor = colorFromKey key, roughness = 0.6 })
+                    )
+                |> List.append [ toLines shape ]
+                |> Scene3d.group
+
+        lines =
+            toLines shape
+
+        triCount =
+            shape |> Csg.toTriangles |> List.length
     in
     { title = "Elm CSG"
     , body =
@@ -515,7 +547,7 @@ view model =
                 [ Attrs.style "padding-right" "24px"
                 , Attrs.style "user-select" "none"
                 ]
-                [ Html.text <| "tri count: " ++ String.fromInt model.triCount ]
+                [ Html.text <| "tri count: " ++ String.fromInt triCount ]
             ]
         , Html.div
             [ Attrs.style "background-color" "rgba(255, 255, 0, 0.2)"
@@ -534,10 +566,10 @@ view model =
                         []
                     )
                         ++ (if model.showLines then
-                                [ model.lines ]
+                                [ lines ]
 
                             else
-                                [ model.mesh ]
+                                [ mesh ]
                            )
                 , upDirection = Direction3d.positiveZ
                 }

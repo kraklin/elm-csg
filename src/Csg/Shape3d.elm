@@ -246,62 +246,73 @@ roundedCuboid { width, height, depth, radius } =
 
             -- edges
             stacks =
-                2
+                3
 
-            edge fromPoint toPoint toFrom toTo =
+            edge fromPoint toPoint toFirstPoint =
                 let
                     maybeAxis =
                         Axis3d.throughPoints fromPoint toPoint
 
                     startingP1 =
-                        toFrom fromPoint
+                        toFirstPoint fromPoint
 
-                    endingP1 =
-                        Maybe.map (\axis -> Point3d.rotateAround axis (Angle.turns -0.25) startingP1) maybeAxis
+                    points startingPoint =
+                        List.range 0 stacks
+                            |> List.map
+                                (\idx ->
+                                    Maybe.map (\axis -> Point3d.rotateAround axis (Angle.turns (-0.25 / toFloat stacks * toFloat idx)) startingPoint) maybeAxis
+                                )
+                            |> List.filterMap identity
+
+                    p1 =
+                        points startingP1
+
+                    p2 =
+                        points startingP2
 
                     startingP2 =
-                        toFrom toPoint
-
-                    endingP2 =
-                        Maybe.map (\axis -> Point3d.rotateAround axis (Angle.turns -0.25) startingP2) maybeAxis
+                        toFirstPoint toPoint
                 in
-                triangleStrip <| List.filterMap identity [ Just startingP1, endingP1, Just <| startingP2, endingP2 ]
+                List.zip p1 p2
+                    |> List.map (\( pa, pb ) -> [ pb, pa ])
+                    |> List.concat
+                    |> triangleStrip
 
             frontTopEdge =
-                edge b c toFrontPoint toTopPoint
+                edge b c toFrontPoint
 
             frontBottomEdge =
-                edge a d toBottomPoint toFrontPoint
+                edge a d toBottomPoint
 
             backBottomEdge =
-                edge e h toBackPoint toBottomPoint
+                edge e h toBackPoint
 
             backTopEdge =
-                edge f g toTopPoint toBackPoint
+                edge f g toTopPoint
 
             leftBottomEdge =
-                edge e a toBottomPoint toLeftPoint
+                edge e a toBottomPoint
 
             leftTopEdge =
-                edge b f toTopPoint toLeftPoint
+                edge b f toTopPoint
 
             rightTopEdge =
-                edge c g toRightPoint toTopPoint
+                edge c g toRightPoint
 
             rightBottomEdge =
-                edge d h toBottomPoint toRightPoint
+                edge d h toBottomPoint
 
             frontLeftEdge =
-                edge a b toFrontPoint toLeftPoint
+                edge a b toFrontPoint
 
             frontRightEdge =
-                edge c d toFrontPoint toRightPoint
+                edge c d toFrontPoint
 
             backRightEdge =
-                edge g h toRightPoint toBackPoint
+                edge g h toRightPoint
 
             backLeftEdge =
-                edge e f toLeftPoint toBackPoint
+                edge e f toLeftPoint
 
             edges =
                 [ frontTopEdge, frontBottomEdge, backBottomEdge, backTopEdge, leftBottomEdge, leftTopEdge, rightTopEdge, rightBottomEdge, frontLeftEdge, frontRightEdge, backRightEdge, backLeftEdge ]
@@ -338,8 +349,7 @@ roundedCuboid { width, height, depth, radius } =
             corners =
                 [ aCorner, bCorner, cCorner, dCorner, eCorner, fCorner, gCorner, hCorner ]
         in
-        --(faces ++ edges ++ corners)
-        [ frontTopEdge ]
+        (faces ++ edges ++ corners)
             |> List.concat
             |> BspTree.build
             |> Shape3d

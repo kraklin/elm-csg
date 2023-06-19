@@ -191,6 +191,7 @@ roundedCuboid =
         , height = Length.centimeters 300
         , depth = Length.centimeters 100
         , radius = Length.centimeters 20
+        , stacks = 4
         }
 
 

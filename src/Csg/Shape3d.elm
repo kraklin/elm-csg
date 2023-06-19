@@ -32,6 +32,7 @@ module Csg.Shape3d exposing
 import Angle exposing (Angle)
 import Axis3d exposing (Axis3d)
 import BspTree exposing (BspTree, Face)
+import Cone3d exposing (startingAt)
 import Direction3d
 import Length exposing (Length, Meters)
 import List.Extra as List
@@ -155,8 +156,8 @@ triangleStrip points =
         |> List.filterMap toFace
 
 
-roundedCuboid : { width : Length, height : Length, depth : Length, radius : Length } -> Shape3d tag c
-roundedCuboid { width, height, depth, radius } =
+roundedCuboid : { width : Length, height : Length, depth : Length, radius : Length, stacks : Int } -> Shape3d tag c
+roundedCuboid { width, height, depth, radius, stacks } =
     if Quantity.lessThanOrEqualTo Quantity.zero radius then
         cuboid { width = width, height = height, depth = depth }
 
@@ -164,6 +165,13 @@ roundedCuboid { width, height, depth, radius } =
         let
             minusRadius =
                 Quantity.minus radius
+
+            stacksClamped =
+                if stacks < 1 then
+                    1
+
+                else
+                    stacks
 
             a =
                 Point3d.xyz radius radius radius
@@ -244,10 +252,6 @@ roundedCuboid { width, height, depth, radius } =
             faces =
                 [ front, back, top, bottom, left, right ]
 
-            -- edges
-            stacks =
-                3
-
             edge fromPoint toPoint toFirstPoint =
                 let
                     maybeAxis =
@@ -257,10 +261,10 @@ roundedCuboid { width, height, depth, radius } =
                         toFirstPoint fromPoint
 
                     points startingPoint =
-                        List.range 0 stacks
+                        List.range 0 stacksClamped
                             |> List.map
                                 (\idx ->
-                                    Maybe.map (\axis -> Point3d.rotateAround axis (Angle.turns (-0.25 / toFloat stacks * toFloat idx)) startingPoint) maybeAxis
+                                    Maybe.map (\axis -> Point3d.rotateAround axis (Angle.turns (-0.25 / toFloat stacksClamped * toFloat idx)) startingPoint) maybeAxis
                                 )
                             |> List.filterMap identity
 
@@ -319,8 +323,53 @@ roundedCuboid { width, height, depth, radius } =
 
             -- corners
             corner point toFirstPlane toSecondPlane toThirdPlane =
-                [ toThirdPlane point, toSecondPlane point, toFirstPlane point ]
-                    |> triangleStrip
+                let
+                    p1 =
+                        toFirstPlane point
+
+                    p2 =
+                        toSecondPlane point
+
+                    p3 =
+                        toThirdPlane point
+
+                    axis1 =
+                        Axis3d.throughPoints point p1
+
+                    axis2 =
+                        Axis3d.throughPoints point p2
+
+                    pointsForRow rowIdx startingPoint =
+                        List.range 0 stacksClamped
+                            |> List.map
+                                (\idx ->
+                                    Maybe.map (\axis -> Point3d.rotateAround axis (Angle.turns (-0.25 / toFloat stacksClamped * toFloat idx)) startingPoint) axis1
+                                )
+                            |> List.filterMap identity
+
+                    startingPoints =
+                        List.range 0 stacksClamped
+                            |> List.map
+                                (\idx ->
+                                    Maybe.map (\axis -> Point3d.rotateAround axis (Angle.turns (-0.25 / toFloat stacksClamped * toFloat idx)) p1) axis2
+                                )
+                            |> List.filterMap identity
+                in
+                startingPoints
+                    |> List.indexedMap pointsForRow
+                    |> List.reverse
+                    |> List.groupsOfWithStep 2 1
+                    |> List.map
+                        (\list ->
+                            case list of
+                                [ listA, listB ] ->
+                                    List.interweave (List.reverse listA) (List.reverse listB)
+
+                                _ ->
+                                    List.concat list
+                        )
+                    |> List.map triangleStrip
+                    |> List.concat
 
             aCorner =
                 corner a toBottomPoint toFrontPoint toLeftPoint

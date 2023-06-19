@@ -39,6 +39,7 @@ import List.Extra as List
 import List.NonEmpty as NonEmpty
 import Plane3d
 import Point3d exposing (Point3d)
+import Point3d.Projection exposing (depth)
 import Quantity exposing (Unitless)
 import Triangle3d
 import Vector3d exposing (Vector3d)
@@ -158,13 +159,27 @@ triangleStrip points =
 
 roundedCuboid : { width : Length, height : Length, depth : Length, radius : Length, stacks : Int } -> Shape3d tag c
 roundedCuboid { width, height, depth, radius, stacks } =
-    if Quantity.lessThanOrEqualTo Quantity.zero radius then
-        cuboid { width = width, height = height, depth = depth }
+    let
+        widthAbs =
+            Quantity.abs width
+
+        heightAbs =
+            Quantity.abs height
+
+        depthAbs =
+            Quantity.abs depth
+
+        r =
+            Quantity.minimum [ Quantity.half widthAbs, Quantity.half heightAbs, Quantity.half depthAbs, radius ]
+                |> Maybe.withDefault radius
+    in
+    if Quantity.lessThanOrEqualTo Quantity.zero r then
+        cuboid { width = widthAbs, height = heightAbs, depth = depthAbs }
 
     else
         let
             minusRadius =
-                Quantity.minus radius
+                Quantity.minus r
 
             stacksClamped =
                 if stacks < 1 then
@@ -174,28 +189,28 @@ roundedCuboid { width, height, depth, radius, stacks } =
                     stacks
 
             a =
-                Point3d.xyz radius radius radius
+                Point3d.xyz r r r
 
             b =
-                Point3d.xyz radius radius (minusRadius height)
+                Point3d.xyz r r (minusRadius heightAbs)
 
             c =
-                Point3d.xyz (minusRadius width) radius (minusRadius height)
+                Point3d.xyz (minusRadius widthAbs) r (minusRadius heightAbs)
 
             d =
-                Point3d.xyz (minusRadius width) radius radius
+                Point3d.xyz (minusRadius widthAbs) r r
 
             e =
-                Point3d.xyz radius (minusRadius depth) radius
+                Point3d.xyz r (minusRadius depthAbs) r
 
             f =
-                Point3d.xyz radius (minusRadius depth) (minusRadius height)
+                Point3d.xyz r (minusRadius depthAbs) (minusRadius heightAbs)
 
             g =
-                Point3d.xyz (minusRadius width) (minusRadius depth) (minusRadius height)
+                Point3d.xyz (minusRadius widthAbs) (minusRadius depthAbs) (minusRadius heightAbs)
 
             h =
-                Point3d.xyz (minusRadius width) (minusRadius depth) radius
+                Point3d.xyz (minusRadius widthAbs) (minusRadius depthAbs) r
 
             toFrontPoint =
                 Point3d.projectOnto Plane3d.zx
@@ -207,15 +222,15 @@ roundedCuboid { width, height, depth, radius, stacks } =
                 Point3d.projectOnto Plane3d.yz
 
             toTopPoint =
-                Plane3d.through (Point3d.xyz width depth height) Direction3d.z
+                Plane3d.through (Point3d.xyz widthAbs depthAbs heightAbs) Direction3d.z
                     |> Point3d.projectOnto
 
             toRightPoint =
-                Plane3d.through (Point3d.xyz width depth height) Direction3d.x
+                Plane3d.through (Point3d.xyz widthAbs depthAbs heightAbs) Direction3d.x
                     |> Point3d.projectOnto
 
             toBackPoint =
-                Plane3d.through (Point3d.xyz width depth height) Direction3d.y
+                Plane3d.through (Point3d.xyz widthAbs depthAbs heightAbs) Direction3d.y
                     |> Point3d.projectOnto
 
             -- faces
@@ -322,7 +337,7 @@ roundedCuboid { width, height, depth, radius, stacks } =
                 [ frontTopEdge, frontBottomEdge, backBottomEdge, backTopEdge, leftBottomEdge, leftTopEdge, rightTopEdge, rightBottomEdge, frontLeftEdge, frontRightEdge, backRightEdge, backLeftEdge ]
 
             -- corners
-            corner point toFirstPlane toSecondPlane toThirdPlane =
+            corner point toFirstPlane toSecondPlane =
                 let
                     p1 =
                         toFirstPlane point
@@ -330,16 +345,13 @@ roundedCuboid { width, height, depth, radius, stacks } =
                     p2 =
                         toSecondPlane point
 
-                    p3 =
-                        toThirdPlane point
-
                     axis1 =
                         Axis3d.throughPoints point p1
 
                     axis2 =
                         Axis3d.throughPoints point p2
 
-                    pointsForRow rowIdx startingPoint =
+                    pointsForRow startingPoint =
                         List.range 0 stacksClamped
                             |> List.map
                                 (\idx ->
@@ -356,7 +368,7 @@ roundedCuboid { width, height, depth, radius, stacks } =
                             |> List.filterMap identity
                 in
                 startingPoints
-                    |> List.indexedMap pointsForRow
+                    |> List.map pointsForRow
                     |> List.reverse
                     |> List.groupsOfWithStep 2 1
                     |> List.map
@@ -372,28 +384,28 @@ roundedCuboid { width, height, depth, radius, stacks } =
                     |> List.concat
 
             aCorner =
-                corner a toBottomPoint toFrontPoint toLeftPoint
+                corner a toBottomPoint toFrontPoint
 
             bCorner =
-                corner b toTopPoint toLeftPoint toFrontPoint
+                corner b toTopPoint toLeftPoint
 
             cCorner =
-                corner c toTopPoint toFrontPoint toRightPoint
+                corner c toTopPoint toFrontPoint
 
             dCorner =
-                corner d toBottomPoint toRightPoint toFrontPoint
+                corner d toBottomPoint toRightPoint
 
             eCorner =
-                corner e toBottomPoint toLeftPoint toBackPoint
+                corner e toBottomPoint toLeftPoint
 
             fCorner =
-                corner f toTopPoint toBackPoint toLeftPoint
+                corner f toTopPoint toBackPoint
 
             gCorner =
-                corner g toTopPoint toRightPoint toBackPoint
+                corner g toTopPoint toRightPoint
 
             hCorner =
-                corner h toBottomPoint toBackPoint toRightPoint
+                corner h toBottomPoint toBackPoint
 
             corners =
                 [ aCorner, bCorner, cCorner, dCorner, eCorner, fCorner, gCorner, hCorner ]

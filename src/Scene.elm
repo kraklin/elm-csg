@@ -64,7 +64,8 @@ type Msg
 
 
 toLines =
-    Csg.toLinesAndNormals True
+    Csg.toLineSegments
+        -- True
         >> List.map
             (\lineSegment ->
                 lineSegment
@@ -120,8 +121,27 @@ init () =
     )
 
 
+shape : CsgShape.Shape3d tag c
 shape =
-    CsgShape.roundedCuboid { width = Length.centimeters 200, height = Length.centimeters 150, depth = Length.centimeters 100, radius = Length.centimeters 20 }
+    CsgShape.roundedCuboid
+        { width = Length.centimeters 80
+        , height = Length.centimeters 80
+        , depth = Length.centimeters 80
+        , radius = Length.centimeters 10
+        , stacks = 8
+        }
+        |> CsgShape.moveRight (Length.centimeters 10)
+        |> CsgShape.moveBackward (Length.centimeters 10)
+        |> CsgShape.moveUp (Length.centimeters 40)
+        |> CsgShape.subtractFrom
+            (CsgShape.roundedCuboid
+                { width = Length.centimeters 130
+                , height = Length.centimeters 60
+                , depth = Length.centimeters 100
+                , radius = Length.centimeters 10
+                , stacks = 8
+                }
+            )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
